@@ -6,14 +6,21 @@ import time
 import keyboard
 import signal
 
+# Precise sleep from
+# https://stackoverflow.com/questions/1133857/how-accurate-is-pythons-time-sleep
+def sleep(duration, get_now=time.perf_counter):
+    now = get_now()
+    end = now + duration
+    while now < end:
+        now = get_now()
+
 # Reset USB Gadget
 os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
 os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
+sleep(0.5)
 
-time.sleep(0.5)
-
+mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
-mouse = os.open('/dev/hidraw0', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
 
@@ -52,13 +59,14 @@ def countup():
     global counter
     while True:
         counter = (counter + 3) % 256
-        time.sleep(0.03)
+        sleep(0.03)
 
+# Communication Functions
 def response(code, cmd, data):
     buf = bytearray([code, cmd])
     buf.extend(data)
     buf.extend(bytearray(64-len(buf)))
-    print(buf.hex())
+    # print(buf.hex())
     try:
         os.write(gadget, buf)
     except BlockingIOError:
@@ -92,31 +100,31 @@ def get_mouse_input():
     global bleft, bright, bmiddle, bprev, bnext, x, y, button_offset, xy_offset
     try:
         buf = os.read(mouse, 64)
-        if (buf[0+button_offset] & 1) == 1:
+        if (buf[button_offset] & 1) == 1:
             bleft = True
         else:
             bleft = False
-        if (buf[0+button_offset] & 2) == 2:
+        if (buf[button_offset] & 2) == 2:
             bright = True
         else:
             bright = False
-        if (buf[0+button_offset] & 4) == 4:
+        if (buf[button_offset] & 4) == 4:
             bmiddle = True
         else:
             bmiddle = False
-        if (buf[0+button_offset] & 8) == 8:
+        if (buf[button_offset] & 8) == 8:
             bprev = True
         else:
             bprev = False
-        if (buf[0+button_offset] & 16) == 16:
+        if (buf[button_offset] & 16) == 16:
             bnext = True
         else:
             bnext = False
         if xy_is_16bit:
-            nonsigx = (buf[1+xy_offset] << 8) | buf[2+xy_offset]
-            nonsigy = (buf[3+xy_offset] << 8) | buf[4+xy_offset]
-            x = (int(nonsigx^0xffff) * -1)-1 if (nonsigx & 0x8000) else int(nonsigx)
-            y = (int(nonsigy^0xffff) * -1)-1 if (nonsigy & 0x8000) else int(nonsigy)
+            uint_x = (buf[1+xy_offset] << 8) | buf[2+xy_offset]
+            uint_y = (buf[3+xy_offset] << 8) | buf[4+xy_offset]
+            x = (int(uint_x^0xffff) * -1)-1 if (uint_x & 0x8000) else int(uint_x)
+            y = (int(uint_y^0xffff) * -1)-1 if (uint_y & 0x8000) else int(uint_y)
         else:
             x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
@@ -129,21 +137,21 @@ def get_mouse_input():
 def calc_gyro():
     global gyrox, gyroy, gyroz, x, y, mouse_threshold
     gyrox = 0
-    gyroy = int((y / mouse_threshold) * 57.3 / 0.070)
-    gyroz = int(-((x / mouse_threshold) * 57.3 / 0.070))
+    gyroy = int( y * 820 / mouse_threshold)
+    gyroz = int(-x * 820 / mouse_threshold)
 
 def get_mouse_and_calc_gyro():
     while True:
         get_mouse_input()
         calc_gyro()
-        time.sleep(1/60)
+        sleep(1/60)
 
-def botoru():
+def bottle():
     global loopcount
     while True:
-        time.sleep(2/60)
+        sleep(2/60)
         loopcount = True
-        time.sleep(2/60)
+        sleep(2/60)
         loopcount = False
 
 
@@ -154,7 +162,6 @@ def input_response():
         buf[2] = 0x00
         if keyboard.is_pressed('l') or bnext:
             #A
-            #print("A")
             buf[1] |= 0x08
         if keyboard.is_pressed('k') or bprev:
             #B
@@ -168,7 +175,7 @@ def input_response():
                 y_hold = False
             else:
                 y_hold = True
-        if keyboard.is_pressed('j') or y_hold:
+        if keyboard.is_pressed('j') or y_hold or keyboard.is_pressed(' '):
             #Y
             buf[1] |= 0x01
         if keyboard.is_pressed('f'):
@@ -253,7 +260,7 @@ def input_response():
         sixaxis[11] = sixaxis[23] = sixaxis[35] = (gyroz >> 8) & 0xff
         buf.extend(sixaxis)
         response(0x30, counter, buf)
-        time.sleep(1/125)
+        sleep(1/125)
 
 def simulate_procon():
     while True:
@@ -311,11 +318,11 @@ def hand(signal, frame):
     disconnect_response()
     os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
     os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
-    time.sleep(0.5)
+    sleep(0.5)
     os._exit(1)
 
 threading.Thread(target=simulate_procon).start()
 threading.Thread(target=countup).start()
 threading.Thread(target=get_mouse_and_calc_gyro).start()
-threading.Thread(target=botoru).start()
+threading.Thread(target=bottle).start()
 signal.signal(signal.SIGINT, hand)
