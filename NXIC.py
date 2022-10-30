@@ -6,14 +6,6 @@ import time
 import keyboard
 import signal
 
-# Precise sleep from
-# https://stackoverflow.com/questions/1133857/how-accurate-is-pythons-time-time.sleep
-def mysleep(duration, get_now=time.perf_counter):
-    now = get_now()
-    end = now + duration
-    while now < end:
-        now = get_now()
-
 # Reset USB Gadget
 os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
 os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
@@ -36,6 +28,9 @@ xy_offset = 0
 
 #If the byte signifying the button press is not the first, enter the number of bytes to be skipped in the offset.
 button_offset = 0
+
+# Set the minimum value for the gyroscope as it does not respond to small values.
+gyro_diff_smallest = 1
 
 #//////////////////////////////////////////////////////////////////////////////
 
@@ -137,8 +132,20 @@ def get_mouse_input():
 def calc_gyro():
     global gyrox, gyroy, gyroz, x, y, mouse_threshold
     gyrox = 0
-    gyroy = int( y * 820 / mouse_threshold)
-    gyroz = int(-x * 820 / mouse_threshold)
+    gyroy_next = y * 820 / mouse_threshold
+    gyroz_next = -x * 820 / mouse_threshold
+    gyroy_diff = gyroy_next - gyroy
+    gyroz_diff = gyroy_next - gyroy
+    if gyroy_diff > 0 and gyroy_diff < gyro_diff_smallest:
+        gyroy_next = gyroy + gyro_diff_smallest
+    elif gyroy_diff < 0 and gyroy_diff > - gyro_diff_smallest:
+        gyroy_next = gyroy - gyro_diff_smallest
+    if gyroz_diff > 0 and gyroz_diff < gyro_diff_smallest:
+        gyroz_next = gyroz + gyro_diff_smallest
+    elif gyroz_diff < 0 and gyroz_diff > - gyro_diff_smallest:
+        gyroz_next = gyroz - gyro_diff_smallest
+    gyroy = int(gyroy_next)
+    gyroz = int(gyroz_next)
 
 def get_mouse_and_calc_gyro():
     while True:
