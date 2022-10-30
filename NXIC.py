@@ -7,8 +7,8 @@ import keyboard
 import signal
 
 # Precise sleep from
-# https://stackoverflow.com/questions/1133857/how-accurate-is-pythons-time-sleep
-def sleep(duration, get_now=time.perf_counter):
+# https://stackoverflow.com/questions/1133857/how-accurate-is-pythons-time-time.sleep
+def mysleep(duration, get_now=time.perf_counter):
     now = get_now()
     end = now + duration
     while now < end:
@@ -17,7 +17,7 @@ def sleep(duration, get_now=time.perf_counter):
 # Reset USB Gadget
 os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
 os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
-sleep(0.5)
+time.sleep(0.5)
 
 mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
@@ -59,7 +59,7 @@ def countup():
     global counter
     while True:
         counter = (counter + 3) % 256
-        sleep(0.03)
+        time.sleep(0.03)
 
 # Communication Functions
 def response(code, cmd, data):
@@ -144,14 +144,14 @@ def get_mouse_and_calc_gyro():
     while True:
         get_mouse_input()
         calc_gyro()
-        sleep(1/60)
+        time.sleep(1/60)
 
 def bottle():
     global loopcount
     while True:
-        sleep(2/60)
+        time.sleep(2/60)
         loopcount = True
-        sleep(2/60)
+        time.sleep(2/60)
         loopcount = False
 
 
@@ -260,7 +260,7 @@ def input_response():
         sixaxis[11] = sixaxis[23] = sixaxis[35] = (gyroz >> 8) & 0xff
         buf.extend(sixaxis)
         response(0x30, counter, buf)
-        sleep(1/125)
+        time.sleep(1/125)
 
 def simulate_procon():
     while True:
@@ -318,7 +318,7 @@ def hand(signal, frame):
     disconnect_response()
     os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
     os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
-    sleep(0.5)
+    time.sleep(0.5)
     os._exit(1)
 
 threading.Thread(target=simulate_procon).start()
