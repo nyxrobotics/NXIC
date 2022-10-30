@@ -30,7 +30,9 @@ xy_offset = 0
 button_offset = 0
 
 # Set the minimum value for the gyroscope as it does not respond to small values.
-gyro_diff_smallest = 1
+gyro_diff_smallest = 20
+gyroy_scale = 4.0 
+gyroz_scale = 1.0 
 
 #//////////////////////////////////////////////////////////////////////////////
 
@@ -45,6 +47,8 @@ bprev = False
 bnext = False
 x = 0
 y = 0
+x_last = 0
+y_last = 0
 gyrox = 0
 gyroy = 0
 gyroz = 0
@@ -124,26 +128,26 @@ def get_mouse_input():
             x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
     except BlockingIOError:
-        x = 0
+        x = 0 
         y = 0
     except:
         os._exit(1)
 
 def calc_gyro():
-    global gyrox, gyroy, gyroz, x, y, mouse_threshold
+    global gyrox, gyroy, gyroz, x, y, mouse_threshold, x_last, y_last
     gyrox = 0
-    gyroy_next = y * 820 / mouse_threshold
-    gyroz_next = -x * 820 / mouse_threshold
-    gyroy_diff = gyroy_next - gyroy
-    gyroz_diff = gyroy_next - gyroy
-    if gyroy_diff > 0 and gyroy_diff < gyro_diff_smallest:
-        gyroy_next = gyroy + gyro_diff_smallest
-    elif gyroy_diff < 0 and gyroy_diff > - gyro_diff_smallest:
-        gyroy_next = gyroy - gyro_diff_smallest
-    if gyroz_diff > 0 and gyroz_diff < gyro_diff_smallest:
-        gyroz_next = gyroz + gyro_diff_smallest
-    elif gyroz_diff < 0 and gyroz_diff > - gyro_diff_smallest:
-        gyroz_next = gyroz - gyro_diff_smallest
+    gyroy_diff = int(y - y_last) * 820.0 * gyroy_scale / mouse_threshold
+    gyroz_diff = -int(x - x_last) * 820.0 * gyroz_scale / mouse_threshold
+    gyroy_next = gyroy + gyroy_diff
+    gyroz_next = gyroz + gyroz_diff
+    gyro_diff = ((gyroy_diff ** 2) + (gyroz_diff ** 2)) ** 0.5
+    if gyro_diff < gyro_diff_smallest and gyro_diff > 0.0:
+        gyroy_diff = gyroy_diff * gyro_diff_smallest / gyro_diff
+        gyroz_diff = gyroz_diff * gyro_diff_smallest / gyro_diff
+        gyroy_next = gyroy + gyroy_diff
+        gyroz_next = gyroz + gyroz_diff
+    x_last = x
+    y_last = y
     gyroy = int(gyroy_next)
     gyroz = int(gyroz_next)
 
