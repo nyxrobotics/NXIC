@@ -16,11 +16,9 @@ gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
 mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
-
-#Change here if you want to adjust the mouse sensitivity.
-#If the mouse sends x,y values in 8 bits, this value is approximately 12.
-#In the case of 16bit, this value is approximately 3000.
-mouse_threshold = 3000
+gyro_y_scale = 1.0
+gyro_z_scale = 1.0
+angle_y_scale = 1.0
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
 #If the x,y value does not start from the second byte (the first byte is probably the button input, but there is an unnecessary byte after it), enter the number of bytes to be skipped in the offset.
@@ -46,6 +44,9 @@ mouse_speed_y = 0
 gyro_x = 0
 gyro_y = 0
 gyro_z = 0
+angle_x = 0
+angle_y = 0
+angle_z = 4096
 y_hold = False
 
 def countup():
@@ -127,10 +128,11 @@ def get_mouse_input():
         os._exit(1)
 
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, mouse_speed_x, mouse_speed_y, mouse_threshold
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, mouse_threshold
     gyro_x = 0
-    gyro_y = int(float(mouse_speed_y) * 0.279)
-    gyro_z = int(float(-mouse_speed_x) * 0.279)
+    gyro_y = int(float(mouse_speed_y) * 0.279 * gyro_y_scale)
+    gyro_z = int(float(-mouse_speed_x) * 0.279 * gyro_z_scale)
+    angle_y -= int(float(mouse_speed_y) * 0.279 * angle_y_scale)
 
 def get_mouse_and_calc_gyro():
     while True:
@@ -245,6 +247,12 @@ def input_response():
         buf[8] = (stick_r_flg >> 8) & 0xff
         buf[9] = (stick_r_flg >> 16) & 0xff
         sixaxis = bytearray(36)
+        sixaxis[0] = sixaxis[18] = sixaxis[30] = angle_y & 0xff
+        sixaxis[1] = sixaxis[19] = sixaxis[31] = (angle_y >> 8) & 0xff
+        sixaxis[2] = sixaxis[20] = sixaxis[32] = angle_x & 0xff
+        sixaxis[3] = sixaxis[21] = sixaxis[33] = (angle_x >> 8) & 0xff
+        sixaxis[4] = sixaxis[22] = sixaxis[34] = angle_z & 0xff
+        sixaxis[5] = sixaxis[23] = sixaxis[35] = (angle_z >> 8) & 0xff
         sixaxis[6] = sixaxis[18] = sixaxis[30] = gyro_x & 0xff
         sixaxis[7] = sixaxis[19] = sixaxis[31] = (gyro_x >> 8) & 0xff
         sixaxis[8] = sixaxis[20] = sixaxis[32] = gyro_y & 0xff
