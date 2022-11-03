@@ -13,7 +13,7 @@ os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
 time.sleep(0.5)
 
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
-mouse = os.open('/dev/hidraw0', os.O_RDWR | os.O_NONBLOCK)
+mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
 
