@@ -11,8 +11,11 @@ os.system('echo > /sys/kernel/config/usb_gadget/procon/UDC')
 os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
 time.sleep(0.5)
 
-mouse = os.open('/dev/hidraw2', os.O_RDWR | os.O_NONBLOCK)
+# mouse = os.open('/dev/hidraw2', os.O_RDWR | os.O_NONBLOCK)
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
+mouse = os.open('/dev/input/by-id/usb-SINOWEALTH_Wired_Gaming_Mouse-event-mouse', os.O_RDWR | os.O_NONBLOCK)
+# gadget = os.open('/dev/input/by-id/usb-Topre_REALFORCE_91_JP-event-kbd', os.O_RDWR | os.O_NONBLOCK)
+
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
 #If the x,y values taken from the mouse are 16 bits each, set to True.
@@ -24,9 +27,9 @@ xy_offset = 0
 button_offset = 0
 
 # Set the minimum value for the gyroscope as it does not respond to small values.
-gyro_y_scale = 23.0
-gyro_z_scale = 20.0
-angle_y_scale = 1.5
+gyro_y_scale = 0 # 23
+gyro_z_scale = 0 # 20
+angle_y_scale = 0 #1.5
 
 #//////////////////////////////////////////////////////////////////////////////
 
@@ -42,8 +45,6 @@ bnext = False
 
 mouse_x = 0
 mouse_y = 0
-mouse_x_last = 0
-mouse_y_last = 0
 
 gyro_x = 0
 gyro_y = 0
@@ -134,21 +135,15 @@ def get_mouse_input():
         os._exit(1)
 
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, mouse_x, mouse_y, mouse_threshold, mouse_x_last, mouse_y_last
-
-    angle_y += (int)(float(mouse_y - mouse_y_last) * angle_y_scale * -1);
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, mouse_x, mouse_y
+    angle_y += (int)(float(mouse_y) * angle_y_scale * -1);
     if angle_y > 3000:
         angle_y = 3000
     if angle_y < -1500:
         angle_y = -1500
-    gyro_y_diff = int(float(mouse_y - mouse_y_last) * gyro_y_scale)
-    gyro_z_diff = -int(float(mouse_x - mouse_x_last) * gyro_z_scale)
-    gyro_y_next = gyro_y + gyro_y_diff
-    gyro_z_next = gyro_z + gyro_z_diff
-    mouse_x_last = mouse_x
-    mouse_y_last = mouse_y
-    gyro_y = int(gyro_y_next)
-    gyro_z = int(gyro_z_next)
+    gyro_x = 0
+    gyro_y = int(float(mouse_y) * gyro_y_scale)
+    gyro_z = -int(float(mouse_x) * gyro_z_scale)
 
 def get_mouse_and_calc_gyro():
     while True:
@@ -262,12 +257,13 @@ def input_response():
         buf[8] = (stick_r_flg >> 8) & 0xff
         buf[9] = (stick_r_flg >> 16) & 0xff
         sixaxis = bytearray(36)
-        sixaxis[0] = sixaxis[18] = sixaxis[30] = angle_x & 0xff
-        sixaxis[1] = sixaxis[19] = sixaxis[31] = (angle_x >> 8) & 0xff
-        sixaxis[2] = sixaxis[20] = sixaxis[32] = angle_y & 0xff
-        sixaxis[3] = sixaxis[21] = sixaxis[33] = (angle_y >> 8) & 0xff
-        sixaxis[4] = sixaxis[22] = sixaxis[34] = angle_z & 0xff
-        sixaxis[5] = sixaxis[23] = sixaxis[35] = (angle_z >> 8) & 0xff
+        # sixaxis[0] = sixaxis[12] = sixaxis[24] = angle_y & 0xff
+        # sixaxis[1] = sixaxis[13] = sixaxis[25] = (angle_y >> 8) & 0xff
+        # sixaxis[2] = sixaxis[14] = sixaxis[26] = angle_x & 0xff
+        # sixaxis[3] = sixaxis[15] = sixaxis[27] = (angle_x >> 8) & 0xff
+        # sixaxis[4] = sixaxis[16] = sixaxis[28] = angle_z & 0xff
+        # sixaxis[5] = sixaxis[17] = sixaxis[29] = (angle_z >> 8) & 0xff
+
         sixaxis[6] = sixaxis[18] = sixaxis[30] = gyro_x & 0xff
         sixaxis[7] = sixaxis[19] = sixaxis[31] = (gyro_x >> 8) & 0xff
         sixaxis[8] = sixaxis[20] = sixaxis[32] = gyro_y & 0xff
