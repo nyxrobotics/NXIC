@@ -50,6 +50,7 @@ angle_x = 0
 angle_y = 0
 angle_z = 4096
 y_hold = False
+mouse_stopcount = 0
 
 def countup():
     global counter
@@ -137,7 +138,7 @@ def get_mouse_input():
         os._exit(1)
 
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, mouse_stopcount
     gyro_x = 0
     gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
     gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
@@ -145,11 +146,22 @@ def calc_gyro():
     if angle_y > 3000:
         angle_y = 3000
         if gyro_y < 0:
-          gyro_y = 0
+            gyro_y = 0
     elif angle_y < -3000:
         angle_y = -3000
         if gyro_y > 0:
-          gyro_y = 0
+            gyro_y = 0
+    if mouse_speed_x != 0 or mouse_speed_y != 0:
+        mouse_stopcount = 0
+    elif mouse_stopcount < 300:
+        mouse_stopcount = mouse_stopcount + 1
+    if mouse_stopcount == 300:
+        if angle_y > 10:
+            angle_y = angle_y - 10
+            gyro_y = gyro_y - 100 # (mouse_stopcount - 300)*1000
+        elif angle_y < 10:
+            angle_y = angle_y + 10
+            gyro_y = gyro_y + 100 # (mouse_stopcount - 300)*1000
 
 def get_mouse_and_calc_gyro():
     while True:
