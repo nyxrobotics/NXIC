@@ -41,11 +41,11 @@ bright = False
 bmiddle = False
 bprev = False
 bnext = False
-x = 0
-y = 0
-gyrox = 0
-gyroy = 0
-gyroz = 0
+mouse_speed_x = 0
+mouse_speed_y = 0
+gyro_x = 0
+gyro_y = 0
+gyro_z = 0
 y_hold = False
 
 def countup():
@@ -89,7 +89,7 @@ def spi_response(addr, data):
     uart_response(0x90, 0x10, buf)
 
 def get_mouse_input():
-    global bleft, bright, bmiddle, bprev, bnext, x, y, button_offset, xy_offset
+    global bleft, bright, bmiddle, bprev, bnext, mouse_speed_x, mouse_speed_y, button_offset, xy_offset
     try:
         buf = os.read(mouse, 64)
         if (buf[0+button_offset] & 1) == 1:
@@ -115,22 +115,22 @@ def get_mouse_input():
         if xy_is_16bit:
             nonsigx = (buf[1+xy_offset] << 8) | buf[2+xy_offset]
             nonsigy = (buf[3+xy_offset] << 8) | buf[4+xy_offset]
-            x = (int(nonsigx^0xffff) * -1)-1 if (nonsigx & 0x8000) else int(nonsigx)
-            y = (int(nonsigy^0xffff) * -1)-1 if (nonsigy & 0x8000) else int(nonsigy)
+            mouse_speed_x = (int(nonsigx^0xffff) * -1)-1 if (nonsigx & 0x8000) else int(nonsigx)
+            mouse_speed_y = (int(nonsigy^0xffff) * -1)-1 if (nonsigy & 0x8000) else int(nonsigy)
         else:
-            x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
-            y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
+            mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
+            mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
     except BlockingIOError:
-        x = 0
-        y = 0
+        mouse_speed_x = 0
+        mouse_speed_y = 0
     except:
         os._exit(1)
 
 def calc_gyro():
-    global gyrox, gyroy, gyroz, x, y, mouse_threshold
-    gyrox = 0
-    gyroy = int((y / mouse_threshold) * 57.3 / 0.070)
-    gyroz = int(-((x / mouse_threshold) * 57.3 / 0.070))
+    global gyro_x, gyro_y, gyro_z, mouse_speed_x, mouse_speed_y, mouse_threshold
+    gyro_x = 0
+    gyro_y = int(float(mouse_speed_y) * 0.279)
+    gyro_z = int(float(-mouse_speed_x) * 0.279)
 
 def get_mouse_and_calc_gyro():
     while True:
@@ -148,7 +148,7 @@ def botoru():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyrox, gyroy, gyroz, y_hold
+    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -245,12 +245,12 @@ def input_response():
         buf[8] = (stick_r_flg >> 8) & 0xff
         buf[9] = (stick_r_flg >> 16) & 0xff
         sixaxis = bytearray(36)
-        sixaxis[6] = sixaxis[18] = sixaxis[30] = gyrox & 0xff
-        sixaxis[7] = sixaxis[19] = sixaxis[31] = (gyrox >> 8) & 0xff
-        sixaxis[8] = sixaxis[20] = sixaxis[32] = gyroy & 0xff
-        sixaxis[9] = sixaxis[21] = sixaxis[33] = (gyroy >> 8) & 0xff
-        sixaxis[10] = sixaxis[22] = sixaxis[34] = gyroz & 0xff
-        sixaxis[11] = sixaxis[23] = sixaxis[35] = (gyroz >> 8) & 0xff
+        sixaxis[6] = sixaxis[18] = sixaxis[30] = gyro_x & 0xff
+        sixaxis[7] = sixaxis[19] = sixaxis[31] = (gyro_x >> 8) & 0xff
+        sixaxis[8] = sixaxis[20] = sixaxis[32] = gyro_y & 0xff
+        sixaxis[9] = sixaxis[21] = sixaxis[33] = (gyro_y >> 8) & 0xff
+        sixaxis[10] = sixaxis[22] = sixaxis[34] = gyro_z & 0xff
+        sixaxis[11] = sixaxis[23] = sixaxis[35] = (gyro_z >> 8) & 0xff
         buf.extend(sixaxis)
         response(0x30, counter, buf)
         time.sleep(1/125)
