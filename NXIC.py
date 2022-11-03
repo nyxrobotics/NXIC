@@ -16,8 +16,8 @@ gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
 mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
-gyro_y_scale = 100.0
-gyro_z_scale = 100.0
+gyro_y_scale = 200.0
+gyro_z_scale = 200.0
 angle_y_scale = gyro_y_scale / 25
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
@@ -157,7 +157,7 @@ def get_mouse_and_calc_gyro():
         calc_gyro()
         time.sleep(1/60)
 
-def botoru():
+def bottle():
     global loopcount
     while True:
         time.sleep(2/60)
@@ -175,7 +175,7 @@ def input_response():
             #A
             #print("A")
             buf[1] |= 0x08
-        if keyboard.is_pressed('k') or bprev or keyboard.is_pressed(' '):
+        if keyboard.is_pressed('k') or bprev or keyboard.is_pressed('capslock'):
             #B
             buf[1] |= 0x04
         if keyboard.is_pressed('i'):
@@ -187,9 +187,12 @@ def input_response():
                 y_hold = False
             else:
                 y_hold = True
-        if keyboard.is_pressed('j') or y_hold or keyboard.is_pressed('capslock'):
+        if keyboard.is_pressed('j') or y_hold or keyboard.is_pressed('shift'):
             #Y
             buf[1] |= 0x01
+        if keyboard.is_pressed('ctrl') and not loopcount:
+            #DDOWN
+            buf[3] |= 0x01
         if keyboard.is_pressed('f'):
             #DUP
             buf[3] |= 0x02
@@ -220,7 +223,7 @@ def input_response():
         if keyboard.is_pressed('r'):
             #L
             buf[3] |= 0x40
-        if keyboard.is_pressed('e') or keyboard.is_pressed('shift'):
+        if keyboard.is_pressed('e') or keyboard.is_pressed(' '):
             #ZL
             buf[3] |= 0x80
         if bleft:
@@ -345,5 +348,5 @@ def hand(signal, frame):
 threading.Thread(target=simulate_procon).start()
 threading.Thread(target=countup).start()
 threading.Thread(target=get_mouse_and_calc_gyro).start()
-threading.Thread(target=botoru).start()
+threading.Thread(target=bottle).start()
 signal.signal(signal.SIGINT, hand)
