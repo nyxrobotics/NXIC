@@ -16,8 +16,8 @@ gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
 mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
-gyro_y_scale = 1.0
-gyro_z_scale = 1.0
+gyro_y_scale = 100.0
+gyro_z_scale = 100.0
 angle_y_scale = gyro_y_scale / 25
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
@@ -27,6 +27,8 @@ xy_offset = 0
 
 #If the byte signifying the button press is not the first, enter the number of bytes to be skipped in the offset.
 button_offset = 0
+
+print_debug = False
 
 #//////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +61,9 @@ def response(code, cmd, data):
     buf = bytearray([code, cmd])
     buf.extend(data)
     buf.extend(bytearray(64-len(buf)))
-    print(buf.hex())
+
+    if print_debug:
+        print(buf.hex())
     try:
         os.write(gadget, buf)
     except BlockingIOError:
@@ -114,10 +118,15 @@ def get_mouse_input():
         else:
             bnext = False
         if xy_is_16bit:
-            nonsigx = (buf[1+xy_offset] << 8) | buf[2+xy_offset]
-            nonsigy = (buf[3+xy_offset] << 8) | buf[4+xy_offset]
-            mouse_speed_x = (int(nonsigx^0xffff) * -1)-1 if (nonsigx & 0x8000) else int(nonsigx)
-            mouse_speed_y = (int(nonsigy^0xffff) * -1)-1 if (nonsigy & 0x8000) else int(nonsigy)
+            uint_mouse_speed_x = (buf[2+xy_offset] << 8) | buf[1+xy_offset]
+            uint_mouse_speed_y = (buf[4+xy_offset] << 8) | buf[3+xy_offset]
+            mouse_speed_x = int(uint_mouse_speed_x&0xffff)
+            mouse_speed_y = int(uint_mouse_speed_y&0xffff)
+            if mouse_speed_x > 0x8000:
+                mouse_speed_x = mouse_speed_x - 0x10000
+            if mouse_speed_y > 0x8000:
+                mouse_speed_y = mouse_speed_y - 0x10000
+            # print('mouse speed:',mouse_speed_x,',',mouse_speed_y)
         else:
             mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
@@ -128,7 +137,7 @@ def get_mouse_input():
         os._exit(1)
 
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, mouse_threshold
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y
     gyro_x = 0
     gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
     gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
@@ -137,8 +146,8 @@ def calc_gyro():
         angle_y = 3000
         if gyro_y < 0:
           gyro_y = 0
-    elif angle_y < -2400:
-        angle_y = -2400
+    elif angle_y < -3000:
+        angle_y = -3000
         if gyro_y > 0:
           gyro_y = 0
 
@@ -158,7 +167,7 @@ def botoru():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold
+    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -178,7 +187,7 @@ def input_response():
                 y_hold = False
             else:
                 y_hold = True
-        if keyboard.is_pressed('j') or y_hold:
+        if keyboard.is_pressed('j') or y_hold or keyboard.is_pressed('capslock'):
             #Y
             buf[1] |= 0x01
         if keyboard.is_pressed('f'):
@@ -283,7 +292,8 @@ def simulate_procon():
                 elif data[1] == 0x04:
                     threading.Thread(target=input_response).start()
                 else:
-                    print('>>>', data.hex())
+                    if print_debug:
+                        print('>>>', data.hex())
             elif data[0] == 0x01 and len(data) > 16:
                 if data[10] == 0x01: # Bluetooth manual pairing
                     uart_response(0x81, data[10], [0x03])
@@ -313,11 +323,13 @@ def simulate_procon():
                     else:
                         print("Unknown SPI address:", data[11:13].hex())
                 else:
-                    print('>>> [UART]', data.hex())
+                    if print_debug:
+                        print('>>> [UART]', data.hex())
             elif data[0] == 0x10 and len(data) == 10:
                 pass
             else:
-                print('>>>', data.hex())
+                if print_debug:
+                    print('>>>', data.hex())
         except BlockingIOError:
             pass
         except:
