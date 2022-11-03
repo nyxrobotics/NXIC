@@ -166,7 +166,7 @@ def input_response():
             #A
             #print("A")
             buf[1] |= 0x08
-        if keyboard.is_pressed('k') or bprev:
+        if keyboard.is_pressed('k') or bprev or keyboard.is_pressed(' '):
             #B
             buf[1] |= 0x04
         if keyboard.is_pressed('i'):
@@ -211,7 +211,7 @@ def input_response():
         if keyboard.is_pressed('r'):
             #L
             buf[3] |= 0x40
-        if keyboard.is_pressed('e'):
+        if keyboard.is_pressed('e') or keyboard.is_pressed('shift'):
             #ZL
             buf[3] |= 0x80
         if bleft:
