@@ -51,10 +51,10 @@ angle_y = 0
 angle_z = 4096
 y_hold = False
 mouse_stopcount = 0
-mouse_stopcount_max = 180
+mouse_stopcount_max = 30
 gyro_y_resetcount = 0
 gyro_y_resetcount_max = 16000
-gyro_y_reset_scale = 10
+gyro_y_reset_scale = 1
 
 def countup():
     global counter
@@ -205,11 +205,6 @@ def input_response():
         if keyboard.is_pressed('capslock') and not loopcount:
             #B
             buf[1] |= 0x04
-            angle_y = 0
-            if angle_y > 1:
-                angle_y = angle_y - 1
-            elif angle_y < -1:
-                angle_y = angle_y + 1
         if keyboard.is_pressed('k') or bprev:
             #B
             buf[1] |= 0x04
