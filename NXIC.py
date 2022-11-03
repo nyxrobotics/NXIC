@@ -175,7 +175,10 @@ def input_response():
             #A
             #print("A")
             buf[1] |= 0x08
-        if keyboard.is_pressed('k') or bprev or keyboard.is_pressed('capslock'):
+        if keyboard.is_pressed('capslock') and not loopcount:
+            #B
+            buf[1] |= 0x04
+        if keyboard.is_pressed('k') or bprev:
             #B
             buf[1] |= 0x04
         if keyboard.is_pressed('i'):
