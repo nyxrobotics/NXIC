@@ -55,6 +55,8 @@ mouse_stopcount_max = 30
 gyro_y_resetcount = 0
 gyro_y_resetcount_max = 16000
 gyro_y_reset_scale = 1
+nice = False
+nice_finished_counter = 0
 
 def countup():
     global counter
@@ -194,7 +196,7 @@ def bottle():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y
+    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, nice, nice_finished_counter
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -204,7 +206,7 @@ def input_response():
             buf[1] |= 0x08
         if keyboard.is_pressed(' '):
             loopcount = False
-        if keyboard.is_pressed('capslock') and not loopcount:
+        if bright and not loopcount:
             #B
             buf[1] |= 0x04
         if keyboard.is_pressed('k') or bprev:
@@ -230,9 +232,29 @@ def input_response():
                 angle_y = angle_y - 1
             elif angle_y < -1:
                 angle_y = angle_y + 1
-        if keyboard.is_pressed('ctrl') and not loopcount:
+        if keyboard.is_pressed('ctrl'):
+            if nice_finished_counter < 3:
+                #RSTICK
+                buf[2] |= 0x04
+                nice_finished_counter = nice_finished_counter + 1
+            else:
+                nice = True
+                if not loopcount:
+                    #DDOWN
+                    buf[3] |= 0x01
+        elif nice:
+            #R
+            buf[1] |= 0x40
+            if nice_finished_counter > 5:
+                nice_finished_counter = 0
+                nice = False
+            else:
+                nice_finished_counter = nice_finished_counter + 1
+
+        if keyboard.is_pressed('alt') and not loopcount:
             #DDOWN
             buf[3] |= 0x01
+
         if keyboard.is_pressed('f'):
             #DUP
             buf[3] |= 0x02
@@ -276,7 +298,7 @@ def input_response():
                 pass
             else:
                 buf[1] |= 0x80
-        if bright:
+        if keyboard.is_pressed('capslock'):
             #R
             buf[1] |= 0x40
         if bmiddle:
