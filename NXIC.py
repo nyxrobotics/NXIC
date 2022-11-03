@@ -15,12 +15,6 @@ mouse = os.open('/dev/hidraw2', os.O_RDWR | os.O_NONBLOCK)
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
-
-#Change here if you want to adjust the mouse sensitivity.
-#If the mouse sends x,y values in 8 bits, this value is approximately 12.
-#In the case of 16bit, this value is approximately 3000.
-mouse_threshold = 3000
-
 #If the x,y values taken from the mouse are 16 bits each, set to True.
 #If the x,y value does not start from the second byte (the first byte is probably the button input, but there is an unnecessary byte after it), enter the number of bytes to be skipped in the offset.
 xy_is_16bit = True
@@ -30,9 +24,9 @@ xy_offset = 0
 button_offset = 0
 
 # Set the minimum value for the gyroscope as it does not respond to small values.
-gyro_diff_smallest = 20
-gyroy_scale = 4.0 
-gyroz_scale = 1.0 
+gyro_y_scale = 23.0
+gyro_z_scale = 20.0
+angle_y_scale = 1.5
 
 #//////////////////////////////////////////////////////////////////////////////
 
@@ -45,13 +39,19 @@ bright = False
 bmiddle = False
 bprev = False
 bnext = False
-x = 0
-y = 0
-x_last = 0
-y_last = 0
-gyrox = 0
-gyroy = 0
-gyroz = 0
+
+mouse_x = 0
+mouse_y = 0
+mouse_x_last = 0
+mouse_y_last = 0
+
+gyro_x = 0
+gyro_y = 0
+gyro_z = 0
+angle_x = 0
+angle_y = 0
+angle_z = 4096
+
 y_hold = False
 
 def countup():
@@ -96,7 +96,7 @@ def spi_response(addr, data):
     uart_response(0x90, 0x10, buf)
 
 def get_mouse_input():
-    global bleft, bright, bmiddle, bprev, bnext, x, y, button_offset, xy_offset
+    global bleft, bright, bmiddle, bprev, bnext, mouse_x, mouse_y, button_offset, xy_offset
     try:
         buf = os.read(mouse, 64)
         if (buf[button_offset] & 1) == 1:
@@ -122,34 +122,33 @@ def get_mouse_input():
         if xy_is_16bit:
             uint_x = (buf[1+xy_offset] << 8) | buf[2+xy_offset]
             uint_y = (buf[3+xy_offset] << 8) | buf[4+xy_offset]
-            x = (int(uint_x^0xffff) * -1)-1 if (uint_x & 0x8000) else int(uint_x)
-            y = (int(uint_y^0xffff) * -1)-1 if (uint_y & 0x8000) else int(uint_y)
+            mouse_x = (int(uint_x^0xffff) * -1)-1 if (uint_x & 0x8000) else int(uint_x)
+            mouse_y = (int(uint_y^0xffff) * -1)-1 if (uint_y & 0x8000) else int(uint_y)
         else:
-            x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
-            y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
+            mouse_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
+            mouse_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
     except BlockingIOError:
-        x = 0 
-        y = 0
+        mouse_x = 0 
+        mouse_y = 0
     except:
         os._exit(1)
 
 def calc_gyro():
-    global gyrox, gyroy, gyroz, x, y, mouse_threshold, x_last, y_last
-    gyrox = 0
-    gyroy_diff = int(y - y_last) * 820.0 * gyroy_scale / mouse_threshold
-    gyroz_diff = -int(x - x_last) * 820.0 * gyroz_scale / mouse_threshold
-    gyroy_next = gyroy + gyroy_diff
-    gyroz_next = gyroz + gyroz_diff
-    gyro_diff = ((gyroy_diff ** 2) + (gyroz_diff ** 2)) ** 0.5
-    if gyro_diff < gyro_diff_smallest and gyro_diff > 0.0:
-        gyroy_diff = gyroy_diff * gyro_diff_smallest / gyro_diff
-        gyroz_diff = gyroz_diff * gyro_diff_smallest / gyro_diff
-        gyroy_next = gyroy + gyroy_diff
-        gyroz_next = gyroz + gyroz_diff
-    x_last = x
-    y_last = y
-    gyroy = int(gyroy_next)
-    gyroz = int(gyroz_next)
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, mouse_x, mouse_y, mouse_threshold, mouse_x_last, mouse_y_last
+
+    angle_y += (int)(float(mouse_y - mouse_y_last) * angle_y_scale * -1);
+    if angle_y > 3000:
+        angle_y = 3000
+    if angle_y < -1500:
+        angle_y = -1500
+    gyro_y_diff = int(float(mouse_y - mouse_y_last) * gyro_y_scale)
+    gyro_z_diff = -int(float(mouse_x - mouse_x_last) * gyro_z_scale)
+    gyro_y_next = gyro_y + gyro_y_diff
+    gyro_z_next = gyro_z + gyro_z_diff
+    mouse_x_last = mouse_x
+    mouse_y_last = mouse_y
+    gyro_y = int(gyro_y_next)
+    gyro_z = int(gyro_z_next)
 
 def get_mouse_and_calc_gyro():
     while True:
@@ -167,7 +166,7 @@ def bottle():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyrox, gyroy, gyroz, y_hold
+    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, y_hold
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -263,12 +262,18 @@ def input_response():
         buf[8] = (stick_r_flg >> 8) & 0xff
         buf[9] = (stick_r_flg >> 16) & 0xff
         sixaxis = bytearray(36)
-        sixaxis[6] = sixaxis[18] = sixaxis[30] = gyrox & 0xff
-        sixaxis[7] = sixaxis[19] = sixaxis[31] = (gyrox >> 8) & 0xff
-        sixaxis[8] = sixaxis[20] = sixaxis[32] = gyroy & 0xff
-        sixaxis[9] = sixaxis[21] = sixaxis[33] = (gyroy >> 8) & 0xff
-        sixaxis[10] = sixaxis[22] = sixaxis[34] = gyroz & 0xff
-        sixaxis[11] = sixaxis[23] = sixaxis[35] = (gyroz >> 8) & 0xff
+        sixaxis[0] = sixaxis[18] = sixaxis[30] = angle_x & 0xff
+        sixaxis[1] = sixaxis[19] = sixaxis[31] = (angle_x >> 8) & 0xff
+        sixaxis[2] = sixaxis[20] = sixaxis[32] = angle_y & 0xff
+        sixaxis[3] = sixaxis[21] = sixaxis[33] = (angle_y >> 8) & 0xff
+        sixaxis[4] = sixaxis[22] = sixaxis[34] = angle_z & 0xff
+        sixaxis[5] = sixaxis[23] = sixaxis[35] = (angle_z >> 8) & 0xff
+        sixaxis[6] = sixaxis[18] = sixaxis[30] = gyro_x & 0xff
+        sixaxis[7] = sixaxis[19] = sixaxis[31] = (gyro_x >> 8) & 0xff
+        sixaxis[8] = sixaxis[20] = sixaxis[32] = gyro_y & 0xff
+        sixaxis[9] = sixaxis[21] = sixaxis[33] = (gyro_y >> 8) & 0xff
+        sixaxis[10] = sixaxis[22] = sixaxis[34] = gyro_z & 0xff
+        sixaxis[11] = sixaxis[23] = sixaxis[35] = (gyro_z >> 8) & 0xff
         buf.extend(sixaxis)
         response(0x30, counter, buf)
         time.sleep(1/125)
