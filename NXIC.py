@@ -18,7 +18,7 @@ mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 #////////////////////////////////USERCONFIG////////////////////////////////////
 gyro_y_scale = 1.0
 gyro_z_scale = 1.0
-angle_y_scale = 1.0
+angle_y_scale = gyro_y_scale / 25
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
 #If the x,y value does not start from the second byte (the first byte is probably the button input, but there is an unnecessary byte after it), enter the number of bytes to be skipped in the offset.
@@ -130,9 +130,17 @@ def get_mouse_input():
 def calc_gyro():
     global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, mouse_threshold
     gyro_x = 0
-    gyro_y = int(float(mouse_speed_y) * 0.279 * gyro_y_scale)
-    gyro_z = int(float(-mouse_speed_x) * 0.279 * gyro_z_scale)
-    angle_y -= int(float(mouse_speed_y) * 0.279 * angle_y_scale)
+    gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
+    gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
+    angle_y = angle_y - int(float(mouse_speed_y) * angle_y_scale)
+    if angle_y > 3000:
+        angle_y = 3000
+        if gyro_y < 0:
+          gyro_y = 0
+    elif angle_y < -2400:
+        angle_y = -2400
+        if gyro_y > 0:
+          gyro_y = 0
 
 def get_mouse_and_calc_gyro():
     while True:
