@@ -178,6 +178,7 @@ def input_response():
         if keyboard.is_pressed('capslock') and not loopcount:
             #B
             buf[1] |= 0x04
+            angle_y = 0
         if keyboard.is_pressed('k') or bprev:
             #B
             buf[1] |= 0x04
@@ -226,9 +227,13 @@ def input_response():
         if keyboard.is_pressed('r'):
             #L
             buf[3] |= 0x40
-        if keyboard.is_pressed('e') or keyboard.is_pressed(' '):
+        if keyboard.is_pressed('e'):
             #ZL
             buf[3] |= 0x80
+        if keyboard.is_pressed(' '):
+            #ZL
+            buf[3] |= 0x80
+            # angle_y = 0
         if bleft:
             #ZR
             if keyboard.is_pressed('p') and not loopcount:
