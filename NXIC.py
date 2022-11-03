@@ -202,6 +202,8 @@ def input_response():
             #A
             #print("A")
             buf[1] |= 0x08
+        if keyboard.is_pressed(' '):
+            loopcount = False
         if keyboard.is_pressed('capslock') and not loopcount:
             #B
             buf[1] |= 0x04
@@ -221,7 +223,7 @@ def input_response():
                 y_hold = False
             else:
                 y_hold = True
-        if keyboard.is_pressed('j') or y_hold or keyboard.is_pressed('shift'):
+        if (keyboard.is_pressed('j') or y_hold or keyboard.is_pressed('shift')) :
             #Y
             buf[1] |= 0x01
             if angle_y > 1:
