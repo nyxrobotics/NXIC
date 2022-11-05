@@ -157,8 +157,8 @@ def calc_gyro():
     if angle_y > 2000:
         angle_y = 2000
         gyro_y = 0
-    elif angle_y < -800:
-        angle_y = -800
+    elif angle_y < -600:
+        angle_y = -600
         gyro_y = 0
 
 def get_mouse_and_calc_gyro():
