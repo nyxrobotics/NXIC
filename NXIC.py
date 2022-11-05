@@ -59,9 +59,11 @@ gyro_y_resetcount_max = 16000
 gyro_y_reset_start_flag = False
 gyro_y_reset_sending_count = 0
 viewpoint_reset_ready_flag = False
-nice = False
-nice_finished_counter = 0
 minimum_sending_count = 3
+nice_mode = False
+nice_mode_changed = False
+nice_counter = 0
+nice_flag = False
 gattling_mode = False
 gattling_mode_changed = False
 
@@ -181,9 +183,10 @@ def bottle():
 
 def input_response():
     global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, \
-    nice, nice_finished_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, \
+    nice, nice_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, \
     gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
-    minimum_sending_count, gattling_mode, gattling_mode_changed
+    minimum_sending_count, gattling_mode, gattling_mode_changed, \
+    nice_mode,nice_mode_changed, nice_counter, nice_flag
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -243,28 +246,11 @@ def input_response():
             #Y
             buf[1] |= 0x01
         if keyboard.is_pressed('ctrl'):
-            if nice_finished_counter < 3:
-                #RSTICK
-                buf[2] |= 0x04
-                nice_finished_counter = nice_finished_counter + 1
-            else:
-                nice = True
-                if not loopcount:
-                    #DDOWN
-                    buf[3] |= 0x01
-        elif nice:
-            #R
-            buf[1] |= 0x40
-            if nice_finished_counter > 5:
-                nice_finished_counter = 0
-                nice = False
-            else:
-                nice_finished_counter = nice_finished_counter + 1
-
+            angle_y = 0
+            buf[1] |= 0x01
         if keyboard.is_pressed('alt') and not loopcount:
             #DDOWN
             buf[3] |= 0x01
-
         if keyboard.is_pressed('f'):
             #DUP
             buf[3] |= 0x02
@@ -307,8 +293,13 @@ def input_response():
             if not gattling_mode_changed:
                 gattling_mode_changed = True
                 gattling_mode = not gattling_mode
+        if keyboard.is_pressed('0'):
+            #Switch nice mode
+            if not nice_mode_changed:
+                nice_mode_changed = True
+                nice_mode = not nice_mode
         else:
-            gattling_mode_changed = False
+            nice_mode_changed = False
         if bleft:
             #ZR
             if (keyboard.is_pressed('p') or gattling_mode) and not loopcount:
@@ -319,8 +310,27 @@ def input_response():
             #R
             buf[1] |= 0x40
         if bmiddle:
-            #RSTICK
-            buf[2] |= 0x04
+            if not nice_mode:
+                #RSTICK
+                buf[2] |= 0x04
+            else:
+                if nice_counter < 3:
+                    #RSTICK
+                    buf[2] |= 0x04
+                    nice_counter = nice_counter + 1
+                else:
+                    nice_flag  = True
+                    if not loopcount:
+                        #DDOWN
+                        buf[3] |= 0x01
+        elif nice_flag:
+            #R
+            buf[1] |= 0x40
+            if nice_counter < 6:
+                nice_counter = nice_counter + 1
+            else:
+                nice_counter = 0
+                nice_flag = False
         lh = 0x800
         lv = 0x800
         rh = 0x800
