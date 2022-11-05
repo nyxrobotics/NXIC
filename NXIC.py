@@ -18,7 +18,7 @@ mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 #////////////////////////////////USERCONFIG////////////////////////////////////
 gyro_y_scale = 200.0
 gyro_z_scale = 200.0
-angle_y_scale = gyro_y_scale / 25
+angle_y_scale = 0.035
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
 #If the x,y value does not start from the second byte (the first byte is probably the button input, but there is an unnecessary byte after it), enter the number of bytes to be skipped in the offset.
@@ -50,13 +50,18 @@ angle_x = 0
 angle_y = 0
 angle_z = 4096
 y_hold = False
-mouse_stopcount = 0
-mouse_stopcount_max = 30
+angle_y_reset_rate = 100
+angle_y_reset_start_value = 0
+angle_y_reset_gyro = 0
+angle_y_reset_finished = 0
 gyro_y_resetcount = 0
 gyro_y_resetcount_max = 16000
-gyro_y_reset_scale = 1
+gyro_y_reset_start_flag = False
+gyro_y_reset_sending_count = 0
+viewpoint_reset_ready_flag = False
 nice = False
 nice_finished_counter = 0
+minimum_sending_count = 3
 
 def countup():
     global counter
@@ -144,46 +149,22 @@ def get_mouse_input():
         os._exit(1)
 
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, mouse_stopcount, mouse_stopcount_max
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y
     gyro_x = 0
     gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
     gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
-    angle_y = angle_y - int(float(mouse_speed_y) * angle_y_scale)
-    if angle_y > 3000:
-        angle_y = 3000
-        if gyro_y < 0:
-            gyro_y = 0
-    elif angle_y < -3000:
-        angle_y = -3000
-        if gyro_y > 0:
-            gyro_y = 0
-    if mouse_speed_x != 0 or mouse_speed_y != 0:
-        mouse_stopcount = 0
-    elif mouse_stopcount < mouse_stopcount_max:
-        mouse_stopcount = mouse_stopcount + 1
-
-def angle_smooth_reset():
-    global mouse_speed_x, mouse_speed_y, angle_y, mouse_stopcount, mouse_stopcount_max, gyro_y, gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_scale
-    if mouse_speed_x == 0 and mouse_speed_y == 0 and mouse_stopcount == mouse_stopcount_max:
-        if gyro_y_resetcount < gyro_y_resetcount_max:
-            gyro_y_resetcount = gyro_y_resetcount + 1
-        if angle_y > gyro_y_reset_scale:
-            angle_y = angle_y - gyro_y_reset_scale
-            gyro_y = - int(gyro_y_reset_scale * gyro_y_resetcount/2.5)
-        elif angle_y < - gyro_y_reset_scale:
-            angle_y = angle_y + gyro_y_reset_scale
-            gyro_y = int(gyro_y_reset_scale * gyro_y_resetcount/2.5)
-        else:
-            angle_y = 0
-            gyro_y = 0
-    else:
-        gyro_y_resetcount = 0
+    angle_y = angle_y - int(float(gyro_y) * angle_y_scale)
+    if angle_y > 2000:
+        angle_y = 2000
+        gyro_y = 0
+    elif angle_y < -1000:
+        angle_y = -1000
+        gyro_y = 0
 
 def get_mouse_and_calc_gyro():
     while True:
         get_mouse_input()
         calc_gyro()
-        angle_smooth_reset()
         time.sleep(1/60)
 
 def bottle():
@@ -196,7 +177,7 @@ def bottle():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, nice, nice_finished_counter
+    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, nice, nice_finished_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, minimum_sending_count
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -212,10 +193,10 @@ def input_response():
         if keyboard.is_pressed('k') or bprev:
             #B
             buf[1] |= 0x04
-            if angle_y > 1:
-                angle_y = angle_y - 1
-            elif angle_y < -1:
-                angle_y = angle_y + 1
+            mouse_speed_x = 0
+            mouse_speed_y = 0
+            mouse_stopcount = mouse_stopcount_max
+            angle_smooth_reset()
         if keyboard.is_pressed('i'):
             #X
             buf[1] |= 0x02
@@ -225,13 +206,40 @@ def input_response():
                 y_hold = False
             else:
                 y_hold = True
-        if (keyboard.is_pressed('j') or y_hold or keyboard.is_pressed('shift')) :
+        if keyboard.is_pressed('shift') and gyro_y_reset_start_flag == False:
+            if angle_y == 0:
+                buf[1] |= 0x01
+            else:
+                angle_y_reset_start_value = angle_y
+                gyro_y_resetcount_max = 10 + int(abs(angle_y) / angle_y_reset_rate)
+                angle_y_reset_gyro = int((angle_y / abs(angle_y)) * angle_y_reset_rate / angle_y_scale)
+                gyro_y_resetcount = 0
+                gyro_y_reset_start_flag = True
+        if gyro_y_reset_start_flag == True:
+            if gyro_y_resetcount < gyro_y_resetcount_max:
+                gyro_y_resetcount = gyro_y_resetcount + 1
+                if angle_y != 0:
+                    gyro_y = angle_y_reset_gyro
+                    angle_y_next = angle_y - int(angle_y / abs(angle_y) * angle_y_reset_rate)
+                    if angle_y_next * angle_y > 0:
+                        angle_y = angle_y_next
+                else:
+                    gyro_y = 0
+                    angle_y = 0
+            else:
+                angle_y = 0
+                if gyro_y_reset_sending_count < minimum_sending_count:
+                    gyro_y_reset_sending_count = gyro_y_reset_sending_count + 1
+                    gyro_y = 0
+                    buf[1] |= 0x01
+                else:
+                    gyro_y_reset_sending_count = 0
+                    gyro_y_reset_start_flag = False
+                    gyro_y = 0
+                    buf[1] |= 0x01
+        if (keyboard.is_pressed('j') or y_hold) :
             #Y
             buf[1] |= 0x01
-            if angle_y > 1:
-                angle_y = angle_y - 1
-            elif angle_y < -1:
-                angle_y = angle_y + 1
         if keyboard.is_pressed('ctrl'):
             if nice_finished_counter < 3:
                 #RSTICK
