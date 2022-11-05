@@ -157,8 +157,8 @@ def calc_gyro():
     if angle_y > 2000:
         angle_y = 2000
         gyro_y = 0
-    elif angle_y < -1000:
-        angle_y = -1000
+    elif angle_y < -800:
+        angle_y = -800
         gyro_y = 0
 
 def get_mouse_and_calc_gyro():
@@ -193,10 +193,6 @@ def input_response():
         if keyboard.is_pressed('k') or bprev:
             #B
             buf[1] |= 0x04
-            mouse_speed_x = 0
-            mouse_speed_y = 0
-            mouse_stopcount = mouse_stopcount_max
-            angle_smooth_reset()
         if keyboard.is_pressed('i'):
             #X
             buf[1] |= 0x02
