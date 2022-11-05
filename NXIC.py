@@ -60,7 +60,7 @@ gyro_y_reset_start_flag = False
 gyro_y_reset_sending_count = 0
 viewpoint_reset_ready_flag = False
 minimum_sending_count = 3
-nice_mode = False
+nice_mode = True
 nice_mode_changed = False
 nice_counter = 0
 nice_flag = False
@@ -207,10 +207,12 @@ def input_response():
             buf[1] |= 0x02
         #y button hold
         if keyboard.is_pressed('y'):
-            if y_hold:
-                y_hold = False
-            else:
-                y_hold = True
+            #Y
+            buf[1] |= 0x01
+        #     if y_hold:
+        #         y_hold = False
+        #     else:
+        #         y_hold = True
         if keyboard.is_pressed('shift') and gyro_y_reset_start_flag == False:
             if angle_y == 0:
                 buf[1] |= 0x01
@@ -314,7 +316,7 @@ def input_response():
                 #RSTICK
                 buf[2] |= 0x04
             else:
-                if nice_counter < 3:
+                if nice_counter < minimum_sending_count:
                     #RSTICK
                     buf[2] |= 0x04
                     nice_counter = nice_counter + 1
@@ -326,7 +328,7 @@ def input_response():
         elif nice_flag:
             #R
             buf[1] |= 0x40
-            if nice_counter < 6:
+            if nice_counter < minimum_sending_count * 2:
                 nice_counter = nice_counter + 1
             else:
                 nice_counter = 0
