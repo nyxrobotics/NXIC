@@ -28,7 +28,7 @@ xy_offset = 0
 #If the byte signifying the button press is not the first, enter the number of bytes to be skipped in the offset.
 button_offset = 0
 
-print_debug = True
+print_debug = False
 
 #//////////////////////////////////////////////////////////////////////////////
 
@@ -62,6 +62,8 @@ viewpoint_reset_ready_flag = False
 nice = False
 nice_finished_counter = 0
 minimum_sending_count = 3
+gattling_mode = False
+gattling_mode_changed = False
 
 def countup():
     global counter
@@ -109,6 +111,7 @@ def get_mouse_input():
     global bleft, bright, bmiddle, bprev, bnext, mouse_speed_x, mouse_speed_y, button_offset, xy_offset
     try:
         buf = os.read(mouse, 64)
+        # print(buf)
         if (buf[0+button_offset] & 1) == 1:
             bleft = True
         else:
@@ -121,11 +124,11 @@ def get_mouse_input():
             bmiddle = True
         else:
             bmiddle = False
-        if (buf[0+button_offset] & 8) == 8:
+        if (buf[0+button_offset] & 0x08) == 8:
             bprev = True
         else:
             bprev = False
-        if (buf[0+button_offset] & 16) == 16:
+        if (buf[0+button_offset] & 0x10) == 16:
             bnext = True
         else:
             bnext = False
@@ -177,7 +180,10 @@ def bottle():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, nice, nice_finished_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, minimum_sending_count
+    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, \
+    nice, nice_finished_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, \
+    gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
+    minimum_sending_count, gattling_mode, gattling_mode_changed
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -296,9 +302,16 @@ def input_response():
             #ZL
             buf[3] |= 0x80
             # angle_y = 0
+        if keyboard.is_pressed('o'):
+            #Switch gattling mode
+            if not gattling_mode_changed:
+                gattling_mode_changed = True
+                gattling_mode = not gattling_mode
+        else:
+            gattling_mode_changed = False
         if bleft:
             #ZR
-            if keyboard.is_pressed('p') and not loopcount:
+            if (keyboard.is_pressed('p') or gattling_mode) and not loopcount:
                 pass
             else:
                 buf[1] |= 0x80
