@@ -159,8 +159,8 @@ def calc_gyro():
     gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
     gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
     angle_y = angle_y - int(float(gyro_y) * angle_y_scale)
-    if angle_y > 2000:
-        angle_y = 2000
+    if angle_y > 1800:
+        angle_y = 1800
         gyro_y = 0
     elif angle_y < -600:
         angle_y = -600
@@ -196,7 +196,9 @@ def input_response():
             buf[1] |= 0x08
         if keyboard.is_pressed(' '):
             loopcount = False
-        if bright and not loopcount:
+            #ZL
+            buf[3] |= 0x80
+        if keyboard.is_pressed('capslock') and not loopcount:
             #B
             buf[1] |= 0x04
         if keyboard.is_pressed('k') or bprev:
@@ -209,10 +211,6 @@ def input_response():
         if keyboard.is_pressed('y'):
             #Y
             buf[1] |= 0x01
-        #     if y_hold:
-        #         y_hold = False
-        #     else:
-        #         y_hold = True
         if keyboard.is_pressed('shift') and gyro_y_reset_start_flag == False:
             if angle_y == 0:
                 buf[1] |= 0x01
@@ -308,7 +306,7 @@ def input_response():
                 pass
             else:
                 buf[1] |= 0x80
-        if keyboard.is_pressed('capslock'):
+        if bright:
             #R
             buf[1] |= 0x40
         if bmiddle:
