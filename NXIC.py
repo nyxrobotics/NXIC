@@ -293,6 +293,8 @@ def input_response():
             if not gattling_mode_changed:
                 gattling_mode_changed = True
                 gattling_mode = not gattling_mode
+        else:
+            gattling_mode_changed = False
         if keyboard.is_pressed('0'):
             #Switch nice mode
             if not nice_mode_changed:
