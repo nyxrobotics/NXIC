@@ -66,6 +66,8 @@ nice_counter = 0
 nice_flag = False
 gattling_mode = False
 gattling_mode_changed = False
+jumping_mode = False
+jumping_mode_changed = False
 
 def countup():
     global counter
@@ -186,7 +188,7 @@ def input_response():
     nice, nice_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, \
     gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
     minimum_sending_count, gattling_mode, gattling_mode_changed, \
-    nice_mode,nice_mode_changed, nice_counter, nice_flag
+    nice_mode,nice_mode_changed, nice_counter, nice_flag, jumping_mode, jumping_mode_changed
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -198,7 +200,14 @@ def input_response():
             loopcount = False
             #ZL
             buf[3] |= 0x80
-        if keyboard.is_pressed('capslock') and not loopcount:
+        if keyboard.is_pressed('capslock'):
+            #Switch jumping mode
+            if not jumping_mode_changed:
+                jumping_mode_changed = True
+                jumping_mode = not jumping_mode
+        else:
+            jumping_mode_changed = False
+        if jumping_mode and not loopcount and not keyboard.is_pressed(' '):
             #B
             buf[1] |= 0x04
         if keyboard.is_pressed('k') or bprev:
