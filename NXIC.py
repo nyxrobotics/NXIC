@@ -68,6 +68,8 @@ gattling_mode = False
 gattling_mode_changed = False
 jumping_mode = False
 jumping_mode_changed = False
+jumping_shoot = False
+jumping_shoot_changed = False
 
 def countup():
     global counter
@@ -188,7 +190,8 @@ def input_response():
     nice, nice_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, \
     gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
     minimum_sending_count, gattling_mode, gattling_mode_changed, \
-    nice_mode,nice_mode_changed, nice_counter, nice_flag, jumping_mode, jumping_mode_changed
+    nice_mode,nice_mode_changed, nice_counter, nice_flag, jumping_mode, jumping_mode_changed, \
+    jumping_shoot, jumping_shoot_changed
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -200,16 +203,7 @@ def input_response():
             loopcount = False
             #ZL
             buf[3] |= 0x80
-        if keyboard.is_pressed('capslock'):
-            #Switch jumping mode
-            if not jumping_mode_changed:
-                jumping_mode_changed = True
-                jumping_mode = not jumping_mode
-        else:
-            jumping_mode_changed = False
-        if jumping_mode and not loopcount and not keyboard.is_pressed(' '):
-            #B
-            buf[1] |= 0x04
+
         if keyboard.is_pressed('k') or bprev:
             #B
             buf[1] |= 0x04
@@ -254,9 +248,6 @@ def input_response():
         if (keyboard.is_pressed('j') or y_hold) :
             #Y
             buf[1] |= 0x01
-        if keyboard.is_pressed('ctrl'):
-            angle_y = 0
-            buf[1] |= 0x01
         if keyboard.is_pressed('alt') and not loopcount:
             #DDOWN
             buf[3] |= 0x01
@@ -297,30 +288,42 @@ def input_response():
             #ZL
             buf[3] |= 0x80
             # angle_y = 0
-        if keyboard.is_pressed('o'):
-            #Switch gattling mode
-            if not gattling_mode_changed:
-                gattling_mode_changed = True
-                gattling_mode = not gattling_mode
-        else:
-            gattling_mode_changed = False
-        if keyboard.is_pressed('0'):
-            #Switch nice mode
-            if not nice_mode_changed:
-                nice_mode_changed = True
-                nice_mode = not nice_mode
-        else:
-            nice_mode_changed = False
-        if bleft:
+
+        if keyboard.is_pressed('ctrl'):
+            angle_y = 0
+            buf[1] |= 0x01
+            if bleft:
+                #Switch gattling mode
+                if not gattling_mode_changed:
+                    gattling_mode_changed = True
+                    gattling_mode = not gattling_mode
+            else:
+                gattling_mode_changed = False
+            if bmiddle:
+                #Switch nice mode
+                if not nice_mode_changed:
+                    nice_mode_changed = True
+                    nice_mode = not nice_mode
+            else:
+                nice_mode_changed = False
+            if keyboard.is_pressed('capslock'):
+                #Switch jump_shoot mode
+                if not jumping_shoot_changed:
+                    jumping_shoot_changed = True
+                    jumping_shoot = not jumping_shoot
+            else:
+                jumping_shoot_changed = False
+
+        if bleft and not keyboard.is_pressed('ctrl'):
             #ZR
             if (keyboard.is_pressed('p') or gattling_mode) and not loopcount:
                 pass
             else:
                 buf[1] |= 0x80
-        if bright:
+        if bright and not keyboard.is_pressed('ctrl'):
             #R
             buf[1] |= 0x40
-        if bmiddle:
+        if bmiddle and not keyboard.is_pressed('ctrl'):
             if not nice_mode:
                 #RSTICK
                 buf[2] |= 0x04
@@ -334,7 +337,7 @@ def input_response():
                     if not loopcount:
                         #DDOWN
                         buf[3] |= 0x01
-        elif nice_flag:
+        elif nice_flag and not keyboard.is_pressed('ctrl'):
             #R
             buf[1] |= 0x40
             if nice_counter < minimum_sending_count * 2:
@@ -342,6 +345,23 @@ def input_response():
             else:
                 nice_counter = 0
                 nice_flag = False
+
+        if keyboard.is_pressed('capslock') and not keyboard.is_pressed('ctrl'):
+            #Switch jumping mode
+            if not jumping_mode_changed:
+                jumping_mode_changed = True
+                jumping_mode = not jumping_mode
+        else:
+            jumping_mode_changed = False
+        # if jumping_mode and not loopcount and not keyboard.is_pressed(' ') and :
+        if jumping_mode and not loopcount and not keyboard.is_pressed(' '):
+            if not jumping_shoot:
+                if not bleft  and not bright  and not bmiddle:
+                    #B
+                    buf[1] |= 0x04
+            else:
+                #B
+                buf[1] |= 0x04
         lh = 0x800
         lv = 0x800
         rh = 0x800
