@@ -17,8 +17,10 @@ mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
 gyro_y_scale = 200.0
-gyro_z_scale = 200.0
+gyro_z_scale = 180.0
 angle_y_scale = 0.035
+stick_z_scale = 30
+stick_z_offset = 320 # 160.0
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
 #If the x,y value does not start from the second byte (the first byte is probably the button input, but there is an unnecessary byte after it), enter the number of bytes to be skipped in the offset.
@@ -70,6 +72,7 @@ jumping_mode = False
 jumping_mode_changed = False
 jumping_shoot = False
 jumping_shoot_changed = False
+angle_y_prev = 0
 
 def countup():
     global counter
@@ -147,7 +150,8 @@ def get_mouse_input():
                 mouse_speed_x = mouse_speed_x - 0x10000
             if mouse_speed_y > 0x8000:
                 mouse_speed_y = mouse_speed_y - 0x10000
-            # print('mouse speed:',mouse_speed_x,',',mouse_speed_y)
+            print('mouse data:',buf)
+            print('mouse speed:',mouse_speed_x,',',mouse_speed_y)
         else:
             mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
@@ -158,17 +162,19 @@ def get_mouse_input():
         os._exit(1)
 
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, angle_y_prev
     gyro_x = 0
     gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
     gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
+    angle_y_prev = angle_y_prev
     angle_y = angle_y - int(float(gyro_y) * angle_y_scale)
-    if angle_y > 1800:
-        angle_y = 1800
+    if angle_y > 2000:
+        angle_y = 2000
         gyro_y = 0
-    elif angle_y < -600:
-        angle_y = -600
+    elif angle_y < -1000:
+        angle_y = -1000
         gyro_y = 0
+    print('gyro output:',gyro_z)
 
 def get_mouse_and_calc_gyro():
     while True:
@@ -191,7 +197,7 @@ def input_response():
     gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
     minimum_sending_count, gattling_mode, gattling_mode_changed, \
     nice_mode,nice_mode_changed, nice_counter, nice_flag, jumping_mode, jumping_mode_changed, \
-    jumping_shoot, jumping_shoot_changed
+    jumping_shoot, jumping_shoot_changed, angle_y_prev, stick_z_scale, stick_z_offset, mouse_speed_x, mouse_speed_y
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -287,8 +293,12 @@ def input_response():
         if keyboard.is_pressed(' '):
             #ZL
             buf[3] |= 0x80
-            # angle_y = 0
-
+            gyro_y = 0
+            angle_y = angle_y_prev
+            if angle_y > 0:
+                angle_y = angle_y - 1
+            elif angle_y < 0:
+                angle_y = angle_y + 1
         if keyboard.is_pressed('ctrl'):
             angle_y = 0
             buf[1] |= 0x01
@@ -382,6 +392,17 @@ def input_response():
             rh = 0x000
         elif keyboard.is_pressed('right'):
             rh = 0xFFF
+        # if stick_z_scale > 0:
+        #     if mouse_speed_x > 0:
+        #         rh_tmp = int(stick_z_offset + mouse_speed_x * stick_z_scale)
+        #         if rh_tmp > 2047:
+        #             rh_tmp = 2047
+        #         rh = 0x800 + rh_tmp
+        #     elif mouse_speed_x < 0:
+        #         rh_tmp = int(-stick_z_offset + mouse_speed_x * stick_z_scale)
+        #         if rh_tmp < -2047:
+        #             rh_tmp = -2047
+        #         rh = 0x800 + rh_tmp
         stick_l_flg = lh | (lv << 12)
         stick_r_flg = rh | (rv << 12)
         buf[4] = stick_l_flg & 0xff
