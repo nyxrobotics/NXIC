@@ -13,11 +13,11 @@ os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
 time.sleep(0.5)
 
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
-mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
+mouse = os.open('/dev/hidraw0', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
-gyro_y_scale = 240.0
-gyro_z_scale = 200.0
+gyro_y_scale = 350.0
+gyro_z_scale = 150.0
 angle_y_scale = 0.04 #0.035
 stick_z_scale = 10
 stick_z_offset = 320 # 160.0
@@ -168,11 +168,11 @@ def calc_gyro():
     gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
     angle_y_prev = angle_y_prev
     angle_y = angle_y - int(float(gyro_y) * angle_y_scale)
-    if angle_y > 2000:
-        angle_y = 2000
+    if angle_y > 3000:
+        angle_y = 3000
         gyro_y = 0
-    elif angle_y < -1000:
-        angle_y = -1000
+    elif angle_y < -3000:
+        angle_y = -3000
         gyro_y = 0
     # print('gyro output:',gyro_z)
 
