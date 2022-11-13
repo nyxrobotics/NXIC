@@ -16,10 +16,10 @@ gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
 mouse = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
-gyro_y_scale = 200.0
-gyro_z_scale = 180.0
-angle_y_scale = 0.035
-stick_z_scale = 30
+gyro_y_scale = 240.0
+gyro_z_scale = 200.0
+angle_y_scale = 0.04 #0.035
+stick_z_scale = 10
 stick_z_offset = 320 # 160.0
 
 #If the x,y values taken from the mouse are 16 bits each, set to True.
@@ -150,8 +150,8 @@ def get_mouse_input():
                 mouse_speed_x = mouse_speed_x - 0x10000
             if mouse_speed_y > 0x8000:
                 mouse_speed_y = mouse_speed_y - 0x10000
-            print('mouse data:',buf)
-            print('mouse speed:',mouse_speed_x,',',mouse_speed_y)
+            # print('mouse data:',buf)
+            # print('mouse speed:',mouse_speed_x,',',mouse_speed_y)
         else:
             mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
@@ -174,7 +174,7 @@ def calc_gyro():
     elif angle_y < -1000:
         angle_y = -1000
         gyro_y = 0
-    print('gyro output:',gyro_z)
+    # print('gyro output:',gyro_z)
 
 def get_mouse_and_calc_gyro():
     while True:
