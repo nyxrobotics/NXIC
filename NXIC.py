@@ -13,7 +13,8 @@ os.system('ls /sys/class/udc > /sys/kernel/config/usb_gadget/procon/UDC')
 time.sleep(0.5)
 
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
-mouse = os.open('/dev/hidraw0', os.O_RDWR | os.O_NONBLOCK)
+mouse = os.open('/dev/hidraw5', os.O_RDWR | os.O_NONBLOCK)
+mouse_sub = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
 gyro_y_scale = 350.0
@@ -38,13 +39,21 @@ counter = 0
 mac_addr = 'D4F0578D7423'
 initial_input = '81008000f8d77a22c87b0c'
 loopcount = False
-bleft = False
-bright = False
-bmiddle = False
-bprev = False
-bnext = False
+
+mouse_left = False
+mouse_right = False
+mouse_middle = False
+mouse_prev = False
+mouse_next = False
 mouse_speed_x = 0
 mouse_speed_y = 0
+
+submouse_left = False
+submouse_right = False
+submouse_middle = False
+submouse_prev = False
+submouse_next = False
+
 gyro_x = 0
 gyro_y = 0
 gyro_z = 0
@@ -117,30 +126,30 @@ def spi_response(addr, data):
     uart_response(0x90, 0x10, buf)
 
 def get_mouse_input():
-    global bleft, bright, bmiddle, bprev, bnext, mouse_speed_x, mouse_speed_y, button_offset, xy_offset
+    global mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, mouse_speed_x, mouse_speed_y, button_offset, xy_offset
     try:
         buf = os.read(mouse, 64)
         # print(buf)
         if (buf[0+button_offset] & 1) == 1:
-            bleft = True
+            mouse_left = True
         else:
-            bleft = False
+            mouse_left = False
         if (buf[0+button_offset] & 2) == 2:
-            bright = True
+            mouse_right = True
         else:
-            bright = False
+            mouse_right = False
         if (buf[0+button_offset] & 4) == 4:
-            bmiddle = True
+            mouse_middle = True
         else:
-            bmiddle = False
+            mouse_middle = False
         if (buf[0+button_offset] & 0x08) == 8:
-            bprev = True
+            mouse_prev = True
         else:
-            bprev = False
+            mouse_prev = False
         if (buf[0+button_offset] & 0x10) == 16:
-            bnext = True
+            mouse_next = True
         else:
-            bnext = False
+            mouse_next = False
         if xy_is_16bit:
             uint_mouse_speed_x = (buf[2+xy_offset] << 8) | buf[1+xy_offset]
             uint_mouse_speed_y = (buf[4+xy_offset] << 8) | buf[3+xy_offset]
@@ -192,7 +201,7 @@ def bottle():
 
 
 def input_response():
-    global loopcount, bleft, bright, bmiddle, bprev, bnext, gyro_x, gyro_y, gyro_z, y_hold, angle_y, \
+    global loopcount, mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, gyro_x, gyro_y, gyro_z, y_hold, angle_y, \
     nice, nice_counter, angle_y_reset_rate, angle_y_reset_start_value, angle_y_reset_gyro, \
     gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
     minimum_sending_count, gattling_mode, gattling_mode_changed, \
@@ -201,26 +210,25 @@ def input_response():
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
-        if keyboard.is_pressed('l') or bnext:
+        if keyboard.is_pressed('5') or mouse_next:
             #A
-            #print("A")
             buf[1] |= 0x08
-        if keyboard.is_pressed(' '):
-            loopcount = False
-            #ZL
-            buf[3] |= 0x80
-
-        if keyboard.is_pressed('k') or bprev:
+        if keyboard.is_pressed('r') or keyboard.is_pressed('w') or mouse_prev:
             #B
             buf[1] |= 0x04
-        if keyboard.is_pressed('i'):
+        if keyboard.is_pressed('4'):
             #X
             buf[1] |= 0x02
         #y button hold
-        if keyboard.is_pressed('y'):
+        if keyboard.is_pressed('e'):
             #Y
             buf[1] |= 0x01
-        if keyboard.is_pressed('shift') and gyro_y_reset_start_flag == False:
+        if keyboard.is_pressed('s'):
+            #ZL
+            buf[3] |= 0x80
+            loopcount = False
+        if keyboard.is_pressed(' ') and gyro_y_reset_start_flag == False:
+            #Y
             if angle_y == 0:
                 buf[1] |= 0x01
             else:
@@ -251,146 +259,141 @@ def input_response():
                     gyro_y_reset_start_flag = False
                     gyro_y = 0
                     buf[1] |= 0x01
-        if (keyboard.is_pressed('j') or y_hold) :
-            #Y
-            buf[1] |= 0x01
         if keyboard.is_pressed('alt') and not loopcount:
             #DDOWN
             buf[3] |= 0x01
-        if keyboard.is_pressed('f'):
+        if (keyboard.is_pressed('j') or y_hold) :
+            #Y
+            buf[1] |= 0x01
+        if keyboard.is_pressed('3'):
             #DUP
             buf[3] |= 0x02
-        elif keyboard.is_pressed('v'):
+        elif keyboard.is_pressed('x'):
             #DDOWN
             buf[3] |= 0x01
-        if keyboard.is_pressed('c'):
+        if keyboard.is_pressed('capslock'):
             #DLEFT
             buf[3] |= 0x08
-        elif keyboard.is_pressed('b'):
+        elif keyboard.is_pressed('f'):
             #DRIGHT
             buf[3] |= 0x04
         if keyboard.is_pressed('h'):
             #HOME
             buf[2] |= 0x10
-        if keyboard.is_pressed('u'):
+        if keyboard.is_pressed('c'):
             #PLUS
             buf[2] |= 0x02
-        if keyboard.is_pressed('t'):
+        if keyboard.is_pressed('shift'):
             #MINUS
             buf[2] |= 0x01
         if keyboard.is_pressed('g'):
             #CAPTURE
             buf[2] |= 0x20
         if keyboard.is_pressed('q'):
+            #RCLICK
+            buf[2] |= 0x04
+        if keyboard.is_pressed('tab'):
             #LCLICK
             buf[2] |= 0x08
-        if keyboard.is_pressed('r'):
+        if keyboard.is_pressed('z'):
             #L
             buf[3] |= 0x40
         if keyboard.is_pressed('e'):
             #ZL
             buf[3] |= 0x80
-        if keyboard.is_pressed(' '):
-            #ZL
-            buf[3] |= 0x80
-            gyro_y = 0
-            angle_y = angle_y_prev
-            if angle_y > 0:
-                angle_y = angle_y - 1
-            elif angle_y < 0:
-                angle_y = angle_y + 1
-        if keyboard.is_pressed('ctrl'):
+        # if keyboard.is_pressed(' '):
+        #     #ZL
+        #     buf[3] |= 0x80
+        #     gyro_y = 0
+        #     angle_y = angle_y_prev
+        #     if angle_y > 0:
+        #         angle_y = angle_y - 1
+        #     elif angle_y < 0:
+        #         angle_y = angle_y + 1
+        if keyboard.is_pressed('1'):
             angle_y = 0
             buf[1] |= 0x01
-            if bleft:
+            if mouse_left:
                 #Switch gattling mode
                 if not gattling_mode_changed:
                     gattling_mode_changed = True
                     gattling_mode = not gattling_mode
             else:
                 gattling_mode_changed = False
-            if bmiddle:
+            if mouse_middle:
                 #Switch nice mode
                 if not nice_mode_changed:
                     nice_mode_changed = True
                     nice_mode = not nice_mode
             else:
                 nice_mode_changed = False
-            if keyboard.is_pressed('capslock'):
+            if keyboard.is_pressed('2'):
                 #Switch jump_shoot mode
                 if not jumping_shoot_changed:
                     jumping_shoot_changed = True
                     jumping_shoot = not jumping_shoot
             else:
                 jumping_shoot_changed = False
-
-        if bleft and not keyboard.is_pressed('ctrl'):
-            #ZR
-            if (keyboard.is_pressed('p') or gattling_mode) and not loopcount:
-                pass
-            else:
-                buf[1] |= 0x80
-        if bright and not keyboard.is_pressed('ctrl'):
-            #R
-            buf[1] |= 0x40
-        if bmiddle and not keyboard.is_pressed('ctrl'):
-            if not nice_mode:
-                #RSTICK
-                buf[2] |= 0x04
-            else:
-                if nice_counter < minimum_sending_count:
+        else:
+            if mouse_left:
+                #ZR
+                if (keyboard.is_pressed('p') or gattling_mode) and not loopcount:
+                    pass
+                else:
+                    buf[1] |= 0x80
+            if mouse_right:
+                #R
+                buf[1] |= 0x40
+            if mouse_middle:
+                if not nice_mode:
                     #RSTICK
                     buf[2] |= 0x04
+                else:
+                    if nice_counter < minimum_sending_count:
+                        #RSTICK
+                        buf[2] |= 0x04
+                        nice_counter = nice_counter + 1
+                    else:
+                        nice_flag  = True
+                        if not loopcount:
+                            #DDOWN
+                            buf[3] |= 0x01
+            elif nice_flag:
+                #R
+                buf[1] |= 0x40
+                if nice_counter < minimum_sending_count * 2:
                     nice_counter = nice_counter + 1
                 else:
-                    nice_flag  = True
-                    if not loopcount:
-                        #DDOWN
-                        buf[3] |= 0x01
-        elif nice_flag and not keyboard.is_pressed('ctrl'):
-            #R
-            buf[1] |= 0x40
-            if nice_counter < minimum_sending_count * 2:
-                nice_counter = nice_counter + 1
-            else:
-                nice_counter = 0
-                nice_flag = False
+                    nice_counter = 0
+                    nice_flag = False
 
-        if keyboard.is_pressed('capslock') and not keyboard.is_pressed('ctrl'):
-            #Switch jumping mode
-            if not jumping_mode_changed:
-                jumping_mode_changed = True
-                jumping_mode = not jumping_mode
-        else:
-            jumping_mode_changed = False
-        # if jumping_mode and not loopcount and not keyboard.is_pressed(' ') and :
-        if jumping_mode and not loopcount and not keyboard.is_pressed(' '):
-            if not jumping_shoot:
-                if not bleft  and not bright  and not bmiddle:
+            if keyboard.is_pressed('2') and not loopcount and not keyboard.is_pressed(' '):
+                if not jumping_shoot:
+                    if not mouse_left  and not mouse_right  and not mouse_middle:
+                        #B
+                        buf[1] |= 0x04
+                else:
                     #B
                     buf[1] |= 0x04
-            else:
-                #B
-                buf[1] |= 0x04
         lh = 0x800
         lv = 0x800
         rh = 0x800
         rv = 0x800
-        if keyboard.is_pressed('w'):
-            lv = 0xFFF
-        elif keyboard.is_pressed('s'):
-            lv = 0x000
-        if keyboard.is_pressed('a'):
-            lh = 0x000
-        elif keyboard.is_pressed('d'):
-            lh = 0xFFF
         if keyboard.is_pressed('up'):
-            rv = 0xFFF
+            lv = 0xFFF
         elif keyboard.is_pressed('down'):
-            rv = 0x000
+            lv = 0x000
         if keyboard.is_pressed('left'):
-            rh = 0x000
+            lh = 0x000
         elif keyboard.is_pressed('right'):
+            lh = 0xFFF
+        # if keyboard.is_pressed('up'):
+        #     rv = 0xFFF
+        # elif keyboard.is_pressed('down'):
+        #     rv = 0x000
+        if keyboard.is_pressed('a'):
+            rh = 0x000
+        elif keyboard.is_pressed('d'):
             rh = 0xFFF
         # if stick_z_scale > 0:
         #     if mouse_speed_x > 0:
