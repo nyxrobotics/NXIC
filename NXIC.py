@@ -223,17 +223,18 @@ def input_response():
         if keyboard.is_pressed('e'):
             #Y
             buf[1] |= 0x01
-        if keyboard.is_pressed('s'):
+        if keyboard.is_pressed('s'): # or keyboard.is_pressed(' '):
             #ZL
             buf[3] |= 0x80
             loopcount = False
         if keyboard.is_pressed(' ') and gyro_y_reset_start_flag == False:
             #Y
             if angle_y == 0:
+                gyro_y = 0
                 buf[1] |= 0x01
             else:
                 angle_y_reset_start_value = angle_y
-                gyro_y_resetcount_max = 10 + int(abs(angle_y) / angle_y_reset_rate)
+                gyro_y_resetcount_max = int(abs(angle_y) / angle_y_reset_rate)
                 angle_y_reset_gyro = int((angle_y / abs(angle_y)) * angle_y_reset_rate / angle_y_scale)
                 gyro_y_resetcount = 0
                 gyro_y_reset_start_flag = True
@@ -241,23 +242,21 @@ def input_response():
             if gyro_y_resetcount < gyro_y_resetcount_max:
                 gyro_y_resetcount = gyro_y_resetcount + 1
                 if angle_y != 0:
-                    gyro_y = angle_y_reset_gyro
-                    angle_y_next = angle_y - int(angle_y / abs(angle_y) * angle_y_reset_rate)
+                    gyro_y = angle_y_reset_gyro * 2
+                    angle_y_next = int(angle_y_reset_start_value * (gyro_y_resetcount_max - gyro_y_resetcount) / gyro_y_resetcount_max)
                     if angle_y_next * angle_y > 0:
                         angle_y = angle_y_next
-                else:
-                    gyro_y = 0
-                    angle_y = 0
             else:
                 angle_y = 0
-                if gyro_y_reset_sending_count < minimum_sending_count:
-                    gyro_y_reset_sending_count = gyro_y_reset_sending_count + 1
-                    gyro_y = 0
+                if gyro_y_resetcount < gyro_y_resetcount_max * 2:
+                    gyro_y_resetcount = gyro_y_resetcount + 1
+                    gyro_y = 0                
+                if gyro_y_resetcount < gyro_y_resetcount_max * 2 + minimum_sending_count * 2:
+                    gyro_y_resetcount = gyro_y_resetcount + 1
                     buf[1] |= 0x01
                 else:
-                    gyro_y_reset_sending_count = 0
                     gyro_y_reset_start_flag = False
-                    gyro_y = 0
+                    gyro_y_reset_sending_count = 0
                     buf[1] |= 0x01
         if keyboard.is_pressed('alt') and not loopcount:
             #DDOWN
@@ -349,7 +348,7 @@ def input_response():
                     #RSTICK
                     buf[2] |= 0x04
                 else:
-                    if nice_counter < minimum_sending_count:
+                    if nice_counter < minimum_sending_count * 2:
                         #RSTICK
                         buf[2] |= 0x04
                         nice_counter = nice_counter + 1
@@ -361,7 +360,7 @@ def input_response():
             elif nice_flag:
                 #R
                 buf[1] |= 0x40
-                if nice_counter < minimum_sending_count * 2:
+                if nice_counter < minimum_sending_count * 4:
                     nice_counter = nice_counter + 1
                 else:
                     nice_counter = 0
