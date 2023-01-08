@@ -47,6 +47,7 @@ mouse_prev = False
 mouse_next = False
 mouse_speed_x = 0
 mouse_speed_y = 0
+mouse_timeout = 0
 
 submouse_left = False
 submouse_right = False
@@ -126,9 +127,10 @@ def spi_response(addr, data):
     uart_response(0x90, 0x10, buf)
 
 def get_mouse_input():
-    global mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, mouse_speed_x, mouse_speed_y, button_offset, xy_offset
+    global mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, mouse_speed_x, mouse_speed_y, button_offset, xy_offset, mouse_timeout
     try:
         buf = os.read(mouse, 64)
+        mouse_timeout = 0
         # print(buf)
         if (buf[0+button_offset] & 1) == 1:
             mouse_left = True
@@ -165,8 +167,11 @@ def get_mouse_input():
             mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
     except BlockingIOError:
-        mouse_speed_x = 0
-        mouse_speed_y = 0
+        if mouse_timeout < 10:
+            mouse_timeout = mouse_timeout + 1
+        else:
+            mouse_speed_x = 0
+            mouse_speed_y = 0
     except:
         os._exit(1)
 
