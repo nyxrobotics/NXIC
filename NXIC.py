@@ -167,11 +167,17 @@ def get_mouse_input():
             mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
     except BlockingIOError:
-        if mouse_timeout < 10:
-            mouse_timeout = mouse_timeout + 1
-        else:
-            mouse_speed_x = 0
-            mouse_speed_y = 0
+        # if mouse_timeout < 3:
+        #     mouse_timeout = mouse_timeout + 1
+        # else:
+        if mouse_speed_x > 0:
+            mouse_speed_x = mouse_speed_x - 1
+        elif mouse_speed_x < 0:
+            mouse_speed_x = mouse_speed_x + 1
+        if mouse_speed_y > 0:
+            mouse_speed_y = mouse_speed_y - 1
+        elif mouse_speed_y < 0:
+            mouse_speed_y = mouse_speed_y + 1
     except:
         os._exit(1)
 
