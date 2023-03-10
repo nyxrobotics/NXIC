@@ -224,7 +224,7 @@ def get_mouse_input():
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
         mouse_pose_x = mouse_pose_x + mouse_speed_x
         mouse_pose_y = mouse_pose_y + mouse_speed_y
-        print('mouse speed:',mouse_speed_x,',',mouse_speed_y,'/','mouse_pose:',mouse_pose_x,',',mouse_pose_y)
+        # print('mouse speed:',mouse_speed_x,',',mouse_speed_y,'/','mouse_pose:',mouse_pose_x,',',mouse_pose_y)
         # return True
     except BlockingIOError:
         mouse_speed_x = 0
@@ -241,8 +241,8 @@ def calc_gyro():
     mouse_speed_x, mouse_speed_y, mouse_pose_x, mouse_pose_y, \
     mouse_pose_x_prev, mouse_pose_y_prev
     gyro_x = 0
-    gyro_y = float(mouse_pose_y - mouse_pose_y_prev) * gyro_y_scale
-    gyro_z = float(-(mouse_pose_x - mouse_pose_x_prev)) * gyro_z_scale
+    gyro_y = int(float(mouse_pose_y - mouse_pose_y_prev) * gyro_y_scale)
+    gyro_z = int(float(-(mouse_pose_x - mouse_pose_x_prev)) * gyro_z_scale)
     mouse_pose_y_prev = mouse_pose_y
     mouse_pose_x_prev = mouse_pose_x
     angle_y = angle_y - int(float(gyro_y) * angle_y_scale)
@@ -258,7 +258,7 @@ def get_mouse_and_calc_gyro():
     while True:
         get_mouse_input()
         calc_gyro()
-        time.sleep(1/60)
+        time.sleep(1/61)
 
 def bottle():
     global loopcount
