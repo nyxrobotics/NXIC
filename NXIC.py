@@ -14,7 +14,7 @@ time.sleep(0.5)
 
 gadget = os.open('/dev/hidg0', os.O_RDWR | os.O_NONBLOCK)
 mouse = os.open('/dev/hidraw5', os.O_RDWR | os.O_NONBLOCK)
-mouse_sub = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
+# mouse_sub = os.open('/dev/hidraw1', os.O_RDWR | os.O_NONBLOCK)
 
 #////////////////////////////////USERCONFIG////////////////////////////////////
 gyro_y_scale = 350.0
@@ -84,6 +84,45 @@ jumping_shoot = False
 jumping_shoot_changed = False
 angle_y_prev = 0
 
+gamepad_sending = False
+gamepad_receiving = False
+
+# Sleep functions
+cyclic_sleep_start_time = time.perf_counter_ns()
+
+def precise_sleep(duration):
+    now = time.perf_counter_ns()
+    previous = now
+    passed = 0.0
+    while duration > passed:
+        now = time.perf_counter_ns()
+        passed = passed + float(now - previous)*1e-9
+
+def init_cyclic_sleep():
+    global cyclic_sleep_curernt_time
+    cyclic_sleep_curernt_time = time.perf_counter_ns()
+
+def cyclic_sleep(duration):
+    global cyclic_sleep_start_time
+    now = time.perf_counter_ns()
+    previous = cyclic_sleep_start_time
+    passed = float(now - previous)*1e-9
+    while duration > passed:
+        now = time.perf_counter_ns()
+        passed = passed + float(now - previous)*1e-9
+    cyclic_sleep_start_time = now
+
+# Function for gattling mode
+def gattling_flag(rate):
+    now = time.perf_counter_ns()
+    loop_ns = int(1e9/rate)
+    remain = now // loop_ns
+    if remain < loop_ns / 2:
+        return True
+    else:
+        return False
+
+    
 def countup():
     global counter
     while True:
@@ -91,6 +130,14 @@ def countup():
         time.sleep(0.03)
 
 def response(code, cmd, data):
+    global gamepad_sending, gamepad_receiving
+
+    receiving_detected = False
+    while gamepad_receiving:
+        receiving_detected = True
+    if receiving_detected:
+        time.sleep(1/250)
+
     buf = bytearray([code, cmd])
     buf.extend(data)
     buf.extend(bytearray(64-len(buf)))
@@ -98,10 +145,16 @@ def response(code, cmd, data):
     if print_debug:
         print(buf.hex())
     try:
+        gamepad_sending = True
         os.write(gadget, buf)
+        gamepad_sending = False
     except BlockingIOError:
+        print('response:BlockingIOError')
+        gamepad_sending = False
         pass
     except:
+        print('response:os.write Failed')
+        gamepad_sending = False
         os._exit(1)
 
 def uart_response(code, subcmd, data):
@@ -210,6 +263,74 @@ def bottle():
         time.sleep(2/60)
         loopcount = False
 
+def simulate_procon():
+    global gamepad_sending, gamepad_receiving
+    while True:
+        try:
+            sending_detected = False
+            while gamepad_sending:
+                sending_detected = True
+            if sending_detected:
+                time.sleep(1/250)
+            gamepad_receiving = True
+            data = os.read(gadget, 128)
+            gamepad_receiving = False
+            # print('>>>', data.hex())
+            if data[0] == 0x80:
+                if data[1] == 0x01:
+                    response(0x81, data[1], bytes.fromhex('0003' + mac_addr))
+                elif data[1] == 0x02:
+                    response(0x81, data[1], [])
+                elif data[1] == 0x04:
+                    threading.Thread(target=input_response).start()
+                else:
+                    if print_debug:
+                        print('>>>', data.hex())
+            elif data[0] == 0x01 and len(data) > 16:
+                if data[10] == 0x01: # Bluetooth manual pairing
+                    uart_response(0x81, data[10], [0x03])
+                elif data[10] == 0x02: # Request device info
+                    uart_response(0x82, data[10], bytes.fromhex('03490302' + mac_addr[::-1] + '0302'))
+                elif data[10] == 0x03 or data[10] == 0x08 or data[10] == 0x30 or data[10] == 0x38 or data[10] == 0x40 or data[10] == 0x48:                
+                    uart_response(0x80, data[10], [])
+                elif data[10] == 0x04: # Trigger buttons elapsed time
+                    uart_response(0x83, data[10], [])
+                elif data[10] == 0x21: # Set NFC/IR MCU configuration
+                    uart_response(0xa0, data[10], bytes.fromhex('0100ff0003000501'))
+                elif data[10] == 0x10:
+                    if data[11:13] == b'\x00\x60': # Serial number
+                        spi_response(data[11:13], bytes.fromhex('ffffffffffffffffffffffffffffffff'))
+                    elif data[11:13] == b'\x50\x60': # Controller Color
+                        spi_response(data[11:13], bytes.fromhex('bc1142 75a928 ffffff ffffff ff')) # Raspberry Color
+                    elif data[11:13] == b'\x80\x60': # Factory Sensor and Stick device parameters
+                        spi_response(data[11:13], bytes.fromhex('50fd0000c60f0f30619630f3d41454411554c7799c333663'))
+                    elif data[11:13] == b'\x98\x60': # Factory Stick device parameters 2
+                        spi_response(data[11:13], bytes.fromhex('0f30619630f3d41454411554c7799c333663'))
+                    elif data[11:13] == b'\x3d\x60': # Factory configuration & calibration 2
+                        spi_response(data[11:13], bytes.fromhex('ba156211b87f29065bffe77e0e36569e8560ff323232ffffff'))
+                    elif data[11:13] == b'\x10\x80': # User Analog sticks calibration
+                        spi_response(data[11:13], bytes.fromhex('ffffffffffffffffffffffffffffffffffffffffffffb2a1'))
+                    elif data[11:13] == b'\x28\x80': # User 6-Axis Motion Sensor calibration
+                        spi_response(data[11:13], bytes.fromhex('beff3e00f001004000400040fefffeff0800e73be73be73b'))
+                    else:
+                        print("Unknown SPI address:", data[11:13].hex())
+                else:
+                    if print_debug:
+                        print('>>> [UART]', data.hex())
+            elif data[0] == 0x10 and len(data) == 10:
+                pass
+            else:
+                if print_debug:
+                    print('>>>', data.hex())
+            time.sleep(1/125)
+        except BlockingIOError:
+            gamepad_receiving = False
+            time.sleep(1/125)
+            # print("simulate_procon():BlockingIOError")
+            pass
+        except:
+            gamepad_receiving = False
+            os._exit(1)
 
 def input_response():
     global loopcount, mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, gyro_x, gyro_y, gyro_z, y_hold, angle_y, \
@@ -440,61 +561,8 @@ def input_response():
         buf.extend(sixaxis)
         response(0x30, counter, buf)
         time.sleep(1/125)
-
-def simulate_procon():
-    while True:
-        try:
-            data = os.read(gadget, 128)
-            if data[0] == 0x80:
-                if data[1] == 0x01:
-                    response(0x81, data[1], bytes.fromhex('0003' + mac_addr))
-                elif data[1] == 0x02:
-                    response(0x81, data[1], [])
-                elif data[1] == 0x04:
-                    threading.Thread(target=input_response).start()
-                else:
-                    if print_debug:
-                        print('>>>', data.hex())
-            elif data[0] == 0x01 and len(data) > 16:
-                if data[10] == 0x01: # Bluetooth manual pairing
-                    uart_response(0x81, data[10], [0x03])
-                elif data[10] == 0x02: # Request device info
-                    uart_response(0x82, data[10], bytes.fromhex('03490302' + mac_addr[::-1] + '0302'))
-                elif data[10] == 0x03 or data[10] == 0x08 or data[10] == 0x30 or data[10] == 0x38 or data[10] == 0x40 or data[10] == 0x48:                
-                    uart_response(0x80, data[10], [])
-                elif data[10] == 0x04: # Trigger buttons elapsed time
-                    uart_response(0x83, data[10], [])
-                elif data[10] == 0x21: # Set NFC/IR MCU configuration
-                    uart_response(0xa0, data[10], bytes.fromhex('0100ff0003000501'))
-                elif data[10] == 0x10:
-                    if data[11:13] == b'\x00\x60': # Serial number
-                        spi_response(data[11:13], bytes.fromhex('ffffffffffffffffffffffffffffffff'))
-                    elif data[11:13] == b'\x50\x60': # Controller Color
-                        spi_response(data[11:13], bytes.fromhex('bc1142 75a928 ffffff ffffff ff')) # Raspberry Color
-                    elif data[11:13] == b'\x80\x60': # Factory Sensor and Stick device parameters
-                        spi_response(data[11:13], bytes.fromhex('50fd0000c60f0f30619630f3d41454411554c7799c333663'))
-                    elif data[11:13] == b'\x98\x60': # Factory Stick device parameters 2
-                        spi_response(data[11:13], bytes.fromhex('0f30619630f3d41454411554c7799c333663'))
-                    elif data[11:13] == b'\x3d\x60': # Factory configuration & calibration 2
-                        spi_response(data[11:13], bytes.fromhex('ba156211b87f29065bffe77e0e36569e8560ff323232ffffff'))
-                    elif data[11:13] == b'\x10\x80': # User Analog sticks calibration
-                        spi_response(data[11:13], bytes.fromhex('ffffffffffffffffffffffffffffffffffffffffffffb2a1'))
-                    elif data[11:13] == b'\x28\x80': # User 6-Axis Motion Sensor calibration
-                        spi_response(data[11:13], bytes.fromhex('beff3e00f001004000400040fefffeff0800e73be73be73b'))
-                    else:
-                        print("Unknown SPI address:", data[11:13].hex())
-                else:
-                    if print_debug:
-                        print('>>> [UART]', data.hex())
-            elif data[0] == 0x10 and len(data) == 10:
-                pass
-            else:
-                if print_debug:
-                    print('>>>', data.hex())
-        except BlockingIOError:
-            pass
-        except:
-            os._exit(1)
+        # print('current_ns:',time.perf_counter_ns())
+        # precise_sleep(1/100)
 
 def hand(signal, frame):
     disconnect_response()
@@ -503,8 +571,10 @@ def hand(signal, frame):
     time.sleep(0.5)
     os._exit(1)
 
+init_cyclic_sleep()
 threading.Thread(target=simulate_procon).start()
 threading.Thread(target=countup).start()
 threading.Thread(target=get_mouse_and_calc_gyro).start()
 threading.Thread(target=bottle).start()
 signal.signal(signal.SIGINT, hand)
+
