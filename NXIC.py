@@ -47,6 +47,8 @@ mouse_prev = False
 mouse_next = False
 mouse_speed_x = 0
 mouse_speed_y = 0
+mouse_pose_x = 0
+mouse_pose_y = 0
 mouse_timeout = 0
 
 submouse_left = False
@@ -82,7 +84,6 @@ jumping_mode = False
 jumping_mode_changed = False
 jumping_shoot = False
 jumping_shoot_changed = False
-angle_y_prev = 0
 
 gamepad_sending = False
 gamepad_receiving = False
@@ -180,7 +181,9 @@ def spi_response(addr, data):
     uart_response(0x90, 0x10, buf)
 
 def get_mouse_input():
-    global mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, mouse_speed_x, mouse_speed_y, button_offset, xy_offset, mouse_timeout
+    global mouse_left, mouse_right, mouse_middle, mouse_prev, mouse_next, \
+    mouse_speed_x, mouse_speed_y, mouse_pose_x, mouse_pose_y, \
+    button_offset, xy_offset, mouse_timeout
     try:
         buf = os.read(mouse, 64)
         mouse_timeout = 0
@@ -219,27 +222,29 @@ def get_mouse_input():
         else:
             mouse_speed_x = -(buf[1] & 0b10000000) | (buf[1] & 0b01111111)
             mouse_speed_y = -(buf[2] & 0b10000000) | (buf[2] & 0b01111111)
+        mouse_pose_x = mouse_pose_x + mouse_speed_x
+        mouse_pose_y = mouse_pose_y + mouse_speed_y
+        print('mouse speed:',mouse_speed_x,',',mouse_speed_y,'/','mouse_pose:',mouse_pose_x,',',mouse_pose_y)
+        # return True
     except BlockingIOError:
-        # if mouse_timeout < 3:
-        #     mouse_timeout = mouse_timeout + 1
-        # else:
-        if mouse_speed_x > 0:
-            mouse_speed_x = mouse_speed_x - 1
-        elif mouse_speed_x < 0:
-            mouse_speed_x = mouse_speed_x + 1
-        if mouse_speed_y > 0:
-            mouse_speed_y = mouse_speed_y - 1
-        elif mouse_speed_y < 0:
-            mouse_speed_y = mouse_speed_y + 1
+        mouse_speed_x = 0
+        mouse_speed_y = 0
+        # return False
     except:
         os._exit(1)
 
+mouse_pose_x_prev = 0
+mouse_pose_y_prev = 0
+
 def calc_gyro():
-    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, mouse_speed_x, mouse_speed_y, angle_y_prev
+    global gyro_x, gyro_y, gyro_z, angle_x, angle_y, angle_z, gyro_y_scale, gyro_z_scale, angle_y_scale, \
+    mouse_speed_x, mouse_speed_y, mouse_pose_x, mouse_pose_y, \
+    mouse_pose_x_prev, mouse_pose_y_prev
     gyro_x = 0
-    gyro_y = int(float(mouse_speed_y) * gyro_y_scale)
-    gyro_z = int(float(-mouse_speed_x) * gyro_z_scale)
-    angle_y_prev = angle_y_prev
+    gyro_y = float(mouse_pose_y - mouse_pose_y_prev) * gyro_y_scale
+    gyro_z = float(-(mouse_pose_x - mouse_pose_x_prev)) * gyro_z_scale
+    mouse_pose_y_prev = mouse_pose_y
+    mouse_pose_x_prev = mouse_pose_x
     angle_y = angle_y - int(float(gyro_y) * angle_y_scale)
     if angle_y > 3000:
         angle_y = 3000
@@ -338,7 +343,7 @@ def input_response():
     gyro_y_resetcount, gyro_y_resetcount_max, gyro_y_reset_start_flag, gyro_y_reset_sending_count, \
     minimum_sending_count, gattling_mode, gattling_mode_changed, \
     nice_mode,nice_mode_changed, nice_counter, nice_flag, jumping_mode, jumping_mode_changed, \
-    jumping_shoot, jumping_shoot_changed, angle_y_prev, stick_z_scale, stick_z_offset, mouse_speed_x, mouse_speed_y
+    jumping_shoot, jumping_shoot_changed, stick_z_scale, stick_z_offset, mouse_speed_x, mouse_speed_y
     while True:
         buf = bytearray.fromhex(initial_input)
         buf[2] = 0x00
@@ -432,15 +437,7 @@ def input_response():
         if keyboard.is_pressed('e'):
             #ZL
             buf[3] |= 0x80
-        # if keyboard.is_pressed(' '):
-        #     #ZL
-        #     buf[3] |= 0x80
-        #     gyro_y = 0
-        #     angle_y = angle_y_prev
-        #     if angle_y > 0:
-        #         angle_y = angle_y - 1
-        #     elif angle_y < 0:
-        #         angle_y = angle_y + 1
+
         if keyboard.is_pressed('1'):
             angle_y = 0
             buf[1] |= 0x01
